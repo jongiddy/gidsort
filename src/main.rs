@@ -3,9 +3,9 @@ extern crate gcd;
 use gcd::Gcd;
 
 
-fn insertion_point<T, F>(value: &T, buffer: &[T], before: F) -> Option<usize>
+fn insertion_point<T, F>(value: &T, buffer: &[T], before: &mut F) -> Option<usize>
     where
-        F: Fn(&T, &T) -> bool
+        F: FnMut(&T, &T) -> bool
 {
     // Find the insertion point where the value would fit
     // All elements to the left of the insertion point are "before" the value
@@ -40,14 +40,13 @@ fn insertion_point<T, F>(value: &T, buffer: &[T], before: F) -> Option<usize>
         lo = lo + 1;
         hi = trial;
     }
-    let mut trial = (hi - lo) / 2 + lo;  // (hi + lo) / 2 is more prone to overflow (however unlikely)
     while hi > lo {
+        let trial = (hi - lo) / 2 + lo;  // (hi+lo)/2 is more prone to overflow (however unlikely)
         if before(&buffer[trial], value) {
             lo = trial + 1
         } else {
             hi = trial
         }
-        trial = (hi - lo) / 2 + lo;
     }
     debug_assert!(lo == hi);
     return Some(lo)
@@ -85,10 +84,10 @@ fn rotate<T>(s: &mut [T], k: usize) {
     }
 }
 
-fn merge<T, F>(mut s: &mut [T], split: usize, lt: F, le: F)
+fn merge<T, F>(mut s: &mut [T], split: usize, mut lt: F, mut le: F)
     where
         T: Ord,
-        F: Fn(&T, &T) -> bool
+        F: FnMut(&T, &T) -> bool
 {
     // The slice to be sorted is divided into S0 | L | M | R | S1
     // The indexes into the slice are l0, l1, r0, r1
@@ -99,7 +98,7 @@ fn merge<T, F>(mut s: &mut [T], split: usize, lt: F, le: F)
     while l1 - l0 > 1 && r1 - r0 > 1 {
         assert!(l1 == r0);  // M is empty
         // Find r0 in L
-        match insertion_point(&s[r0], &s[l0 .. l1], &le) {
+        match insertion_point(&s[r0], &s[l0 .. l1], &mut le) {
             None => {
                 // r0 > lmax - done
                 return
@@ -114,7 +113,7 @@ fn merge<T, F>(mut s: &mut [T], split: usize, lt: F, le: F)
         }
         while l0 < l1 && l1 < r0 && r0 < r1 {
             // While L, M, and R exist, find insertion point of M[0] in R
-            match insertion_point(&s[l1], &s[r0 .. r1], &lt) {
+            match insertion_point(&s[l1], &s[r0 .. r1], &mut lt) {
                 None => {
                     // R < M < L
                     // LMR -> RML
@@ -184,7 +183,7 @@ fn merge<T, F>(mut s: &mut [T], split: usize, lt: F, le: F)
     }
     if l1 - l0 == 1 {
         // |L| = 1: Just insert it into R
-        match insertion_point(&s[l0], &s[r0 .. r1], lt) {
+        match insertion_point(&s[l0], &s[r0 .. r1], &mut lt) {
             None => rotate(&mut s[l0 .. r1], r1 - r0),
             Some(pos) if pos != 0 => rotate(&mut s[l0 .. r0 + pos], pos),
             _ => {
@@ -193,7 +192,7 @@ fn merge<T, F>(mut s: &mut [T], split: usize, lt: F, le: F)
         }
     } else if r1 - r0 == 1 {
         // |R| = 1: Just insert it into L
-        match insertion_point(&s[r0], &s[l0 .. l1], le) {
+        match insertion_point(&s[r0], &s[l0 .. l1], &mut le) {
             None => {
                 // already in position
             }
@@ -205,55 +204,83 @@ fn merge<T, F>(mut s: &mut [T], split: usize, lt: F, le: F)
 #[cfg(not(test))]
 fn main() {
     let mut a = vec![2, 4, 6, 1, 3, 5];
-    merge(&mut a, 3, i32::lt, i32::le)
+    merge(&mut a, 3, &mut i32::lt, &mut i32::le)
 }
 
 #[cfg(test)]
 mod tests {
     #[test]
     fn bisect0() {
-        assert!(super::insertion_point(&3, &[], i32::lt) == None)
+        assert_eq!(super::insertion_point(&3, &[], &mut i32::lt), None)
     }
 
     #[test]
     fn bisect1_before() {
-        assert!(super::insertion_point(&1, &[2], i32::lt) == Some(0))
+        assert_eq!(super::insertion_point(&1, &[2], &mut i32::lt), Some(0))
     }
     #[test]
     fn bisect1_after() {
-        assert!(super::insertion_point(&3, &[2], i32::lt) == None)
+        assert_eq!(super::insertion_point(&3, &[2], &mut i32::lt), None)
     }
 
     #[test]
     fn bisect2_before() {
-        assert!(super::insertion_point(&1, &[2, 4], i32::lt) == Some(0))
+        assert_eq!(super::insertion_point(&1, &[2, 4], &mut i32::lt), Some(0))
     }
     #[test]
     fn bisect2_middle() {
-        assert!(super::insertion_point(&3, &[2, 4], i32::lt) == Some(1))
+        assert_eq!(super::insertion_point(&3, &[2, 4], &mut i32::lt), Some(1))
     }
     #[test]
     fn bisect2_after() {
-        assert!(super::insertion_point(&5, &[2, 4], i32::lt) == None)
+        assert_eq!(super::insertion_point(&5, &[2, 4], &mut i32::lt), None)
     }
 
     #[test]
     fn bisect3_before() {
-        assert!(super::insertion_point(&1, &[2, 4, 6], i32::lt) == Some(0))
+        assert_eq!(super::insertion_point(&1, &[2, 4, 6], &mut i32::lt), Some(0))
     }
     #[test]
     fn bisect3_lt() {
         // Use less-than if the value should be inserted before equal values
-        assert!(super::insertion_point(&4, &[2, 4, 6], i32::lt) == Some(1))
+        assert_eq!(super::insertion_point(&4, &[2, 4, 6], &mut i32::lt), Some(1))
     }
     #[test]
     fn bisect3_le() {
         // Use less-than-or-equal if value should be inserted after equal values
-        assert!(super::insertion_point(&4, &[2, 4, 6], i32::le) == Some(2))
+        assert_eq!(super::insertion_point(&4, &[2, 4, 6], &mut i32::le), Some(2))
     }
     #[test]
     fn bisect3_after() {
-        assert!(super::insertion_point(&7, &[2, 4, 6], i32::lt) == None)
+        assert_eq!(super::insertion_point(&7, &[2, 4, 6], &mut i32::lt), None)
+    }
+
+    #[test]
+    fn bisect3_even() {
+        let s = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16];
+        let mut profile = Vec::new();
+        for v in 1 .. 18 {
+            let mut count = 0;
+            {
+                super::insertion_point(&v, &s, &mut |&a, &b|{count += 1; a < b});
+            }
+            profile.push(count);
+        }
+        assert_eq!(profile, vec![2, 5, 5, 5, 5, 5, 5, 4, 5, 5, 5, 5, 5, 5, 5, 5, 2])
+    }
+
+    #[test]
+    fn bisect3_odd() {
+        let s = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
+        let mut profile = Vec::new();
+        for v in 1 .. 17 {
+            let mut count = 0;
+            {
+                super::insertion_point(&v, &s, &mut |&a, &b|{count += 1; a < b});
+            }
+            profile.push(count);
+        }
+        assert_eq!(profile, vec![2, 5, 5, 5, 5, 5, 5, 4, 5, 5, 5, 5, 5, 5, 4, 2])
     }
 
     #[test]
