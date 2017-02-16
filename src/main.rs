@@ -35,7 +35,7 @@ fn split_biased(n: usize) -> usize {
     n & !mask
 }
 
-fn insertion_point<T, F>(value: &T, buffer: &[T], before: &mut F) -> Option<usize>
+fn insertion_point<T, F>(value: &T, buffer: &[T], before: &mut F) -> (usize, usize)
     where
         F: FnMut(&T, &T) -> bool
 {
@@ -45,35 +45,12 @@ fn insertion_point<T, F>(value: &T, buffer: &[T], before: &mut F) -> Option<usiz
     // The "before" function returns true if it's first argument is "before" the second.
     // Typically, this will be PartialOrd::lt to insert the value before equal values
     // or PartialOrd::le to insert the value after other equal values.
-    // The function performs a binary search, but is biased to look for values before or after
-    // all the values in the slice.  It starts with the mid-point. Depending on that test, it
-    // then tests whether the value is before slice, or value is after slice. It then bisects
-    // the half identified by the first two comparisons.
-    // Returns index to first element in the slice that is not before the value. If there is no
-    // element, it returns None (rather than slice length). This ensures that the caller
-    // special-cases that event, to avoid using an element that is not in the slice.
-    // TODO - could support a RANDOM flag that uses normal binary search instead of biased
-    // to allow user to flag whether data is truly random
-    if buffer.is_empty() {
-        return None
-    }
+    let length = buffer.len();
     let mut lo = 0;   // lowest candidate
-    let mut hi = buffer.len() - 1; // highest candidate
-    let trial = hi / 2;
-    if before(&buffer[trial], value) {
-        if trial == hi || before(&buffer[hi], value) {
-            return None
-        }
-        lo = trial + 1;
-    } else {
-        if trial == lo || !before(&buffer[lo], value) {
-            return Some(lo)
-        }
-        lo = lo + 1;
-        hi = trial;
-    }
+    let mut hi = length; // highest candidate
     while hi > lo {
-        let trial = (hi - lo) / 2 + lo;  // (hi+lo)/2 is more prone to overflow (however unlikely)
+        let trial = split_biased(hi - lo) + lo;
+        debug_assert!(trial < length);
         if before(&buffer[trial], value) {
             lo = trial + 1
         } else {
@@ -81,7 +58,7 @@ fn insertion_point<T, F>(value: &T, buffer: &[T], before: &mut F) -> Option<usiz
         }
     }
     debug_assert!(lo == hi);
-    return Some(lo)
+    (lo, length)
 }
 
 fn swap_sequence<T>(s: &mut [T], a: usize, b: usize, k: usize) {
@@ -130,71 +107,67 @@ fn merge<T, F>(mut s: &mut [T], split: usize, mut lt: F, mut le: F)
     while l1 - l0 > 1 && r1 - r0 > 1 {
         assert!(l1 == r0);  // M is empty
         // Find r0 in L
-        match insertion_point(&s[r0], &s[l0 .. l1], &mut le) {
-            None => {
-                // r0 > lmax - done
-                return
-            }
-            Some(pos) => {
-                // swap values, and add r0 into M
-                let ins = l0 + pos;
-                s.swap(ins, r0);
-                l0 = ins + 1;
-                r0 += 1;
-            }
+        let (pos, length) = insertion_point(&s[r0], &s[l0 .. l1], &mut le);
+        if pos == length {
+            // r0 > lmax - done
+            return
+        } else {
+            // swap values, and add l_pos into M
+            let l_pos = l0 + pos;
+            s.swap(l_pos, r0);
+            l0 = l_pos + 1;
+            r0 += 1;
         }
         while l0 < l1 && l1 < r0 && r0 < r1 {
             // While L, M, and R exist, find insertion point of M[0] in R
-            match insertion_point(&s[l1], &s[r0 .. r1], &mut lt) {
-                None => {
-                    // R < M < L
-                    // LMR -> RML
-                    // first, swap min(|L|,|R|) to make:
-                    // S(from Ra)-Lb-Ma-Mb(from La)-Rb, one of Lb or Rb is empty
-                    // then, if Lb is empty, rotate Ma-Mb-Rb to Rb-Ma-Mb, return
-                    // else rotate Lb-Ma-Mb to Ma-Mb-Lb, return
-                    let llen = l1 - l0;
-                    let rlen = r1 - r0;
-                    // TODO - remove if with:
-                    // let maxlen = max(llen, rlen);
-                    // let minlen = min(llen, rlen);
-                    // swap_sequence(&mut s, l0, r0, minlen);
-                    // l0 += minlen;
-                    // r0 += minlen;
-                    // rotate(&mut s[l0 .. r1], maxlen - minlen);
-                    if llen < rlen {
-                        swap_sequence(&mut s, l0, r0, llen);
-                        l0 += llen;
-                        // r0 += llen;
-                        rotate(&mut s[l0 .. r1], rlen - llen);
-                    } else {
-                        swap_sequence(&mut s, l0, r0, rlen);
-                        l0 += rlen;
-                        // r0 += rlen;
-                        rotate(&mut s[l0 .. r1], llen - rlen)
-                    }
-                    return
+            let (pos, length) = insertion_point(&s[l1], &s[r0 .. r1], &mut lt);
+            if pos == length {
+                // R < M < L
+                // LMR -> RML
+                // first, swap min(|L|,|R|) to make:
+                // Ra | Lb | Ma La | Rb, one of Lb or Rb is empty
+                // then, if Lb is empty, rotate Ma-La-Rb to Rb-Ma-La, return
+                // else rotate Lb-Ma-La to Ma-La-Lb, return
+                let llen = l1 - l0;
+                let rlen = r1 - r0;
+                // TODO - remove if with:
+                // let maxlen = max(llen, rlen);
+                // let minlen = min(llen, rlen);
+                // swap_sequence(&mut s, l0, r0, minlen);
+                // l0 += minlen;
+                // r0 += minlen;
+                // rotate(&mut s[l0 .. r1], maxlen - minlen);
+                if llen < rlen {
+                    swap_sequence(&mut s, l0, r0, llen);
+                    l0 += llen;
+                    // r0 += llen;
+                    rotate(&mut s[l0 .. r1], rlen - llen);
+                } else {
+                    swap_sequence(&mut s, l0, r0, rlen);
+                    l0 += rlen;
+                    // r0 += rlen;
+                    rotate(&mut s[l0 .. r1], llen - rlen);
                 }
-                Some(pos) => {
-                    // L-M-R0..pos-Rpos..
-                    //swap L/R to min |L|, pos
-                    // R0-L1-M-L0-R0x-R1, either L1 is empty or R0x is empty
-                    // if L1 is empty, rotate M-L0-R0x to R0x-M-L0, R0-R0x-M[0] => S, M->L
-                    // else R0-L1-M-L0-R1
-                    let llen = l1 - l0;
-                    if llen < pos {
-                        swap_sequence(&mut s, l0, r0, llen);
-                        // L is empty
-                        rotate(&mut s[l1 .. r0 + pos], pos - llen);
-                        l0 += pos + 1; // Ra + M0
-                        l1 = r0 + pos;
-                        r0 = l1;
-                    } else {
-                        swap_sequence(&mut s, l0, r0, pos);
-                        // find where R0 goes in M-L0. If None, then rotate L1-M-L0 -> M-L0-L1
-                        // else rotate L1 and M < R0. Then swap R0 and L1,0.
-                        // or insertion sort R0 into M
-                    }
+                return
+            } else {
+                // L-M-R0..pos-Rpos..
+                //swap L/R to min |L|, pos
+                // R0-L1-M-L0-R0x-R1, either L1 is empty or R0x is empty
+                // if L1 is empty, rotate M-L0-R0x to R0x-M-L0, R0-R0x-M[0] => S, M->L
+                // else R0-L1-M-L0-R1
+                let llen = l1 - l0;
+                if llen < pos {
+                    swap_sequence(&mut s, l0, r0, llen);
+                    // L is empty
+                    rotate(&mut s[l1 .. r0 + pos], pos - llen);
+                    l0 += pos + 1; // Ra + M0
+                    l1 = r0 + pos;
+                    r0 = l1;
+                } else {
+                    swap_sequence(&mut s, l0, r0, pos);
+                    // find where R0 goes in M-L0. If None, then rotate L1-M-L0 -> M-L0-L1
+                    // else rotate L1 and M < R0. Then swap R0 and L1,0.
+                    // or insertion sort R0 into M
                 }
             }
             // match insertion_point(&s[r0], &s[l1 .. r0], le) {
@@ -215,21 +188,20 @@ fn merge<T, F>(mut s: &mut [T], split: usize, mut lt: F, mut le: F)
     }
     if l1 - l0 == 1 {
         // |L| = 1: Just insert it into R
-        match insertion_point(&s[l0], &s[r0 .. r1], &mut lt) {
-            None => rotate(&mut s[l0 .. r1], r1 - r0),
-            Some(pos) if pos != 0 => rotate(&mut s[l0 .. r0 + pos], pos),
-            _ => {
-                // already in position
-            },
+        let (pos, length) = insertion_point(&s[l0], &s[r0 .. r1], &mut lt);
+        if pos == length {
+            rotate(&mut s[l0 .. r1], r1 - r0);
+        } else if pos != 0 {
+            rotate(&mut s[l0 .. r0 + pos], pos);
         }
+        // else already in position
     } else if r1 - r0 == 1 {
         // |R| = 1: Just insert it into L
-        match insertion_point(&s[r0], &s[l0 .. l1], &mut le) {
-            None => {
-                // already in position
-            }
-            Some(pos) => rotate(&mut s[l0 + pos .. r1], 1),
+        let (pos, length) = insertion_point(&s[r0], &s[l0 .. l1], &mut le);
+        if pos < length {
+            rotate(&mut s[l0 + pos .. r1], 1);
         }
+        // else already in position
     } // at least one of |L| and |R| == 0
 }
 
@@ -283,118 +255,139 @@ mod tests {
 
     #[test]
     fn bisect0() {
-        assert_eq!(super::insertion_point(&3, &[], &mut i32::lt), None)
+        assert_eq!(super::insertion_point(&3, &[], &mut i32::lt), (0, 0))
     }
 
     #[test]
     fn bisect1_before() {
-        assert_eq!(super::insertion_point(&1, &[2], &mut i32::lt), Some(0))
+        assert_eq!(super::insertion_point(&1, &[2], &mut i32::lt), (0, 1))
     }
     #[test]
     fn bisect1_after() {
-        assert_eq!(super::insertion_point(&3, &[2], &mut i32::lt), None)
+        assert_eq!(super::insertion_point(&3, &[2], &mut i32::lt), (1, 1))
     }
 
     #[test]
     fn bisect2_before() {
-        assert_eq!(super::insertion_point(&1, &[2, 4], &mut i32::lt), Some(0))
+        assert_eq!(super::insertion_point(&1, &[2, 4], &mut i32::lt), (0, 2))
     }
     #[test]
     fn bisect2_middle() {
-        assert_eq!(super::insertion_point(&3, &[2, 4], &mut i32::lt), Some(1))
+        assert_eq!(super::insertion_point(&3, &[2, 4], &mut i32::lt), (1, 2))
     }
     #[test]
     fn bisect2_after() {
-        assert_eq!(super::insertion_point(&5, &[2, 4], &mut i32::lt), None)
+        assert_eq!(super::insertion_point(&5, &[2, 4], &mut i32::lt), (2, 2))
     }
 
     #[test]
     fn bisect3_before() {
-        assert_eq!(super::insertion_point(&1, &[2, 4, 6], &mut i32::lt), Some(0))
+        assert_eq!(super::insertion_point(&1, &[2, 4, 6], &mut i32::lt), (0, 3))
     }
     #[test]
     fn bisect3_lt() {
         // Use less-than if the value should be inserted before equal values
-        assert_eq!(super::insertion_point(&4, &[2, 4, 6], &mut i32::lt), Some(1))
+        assert_eq!(super::insertion_point(&4, &[2, 4, 6], &mut i32::lt), (1, 3))
     }
     #[test]
     fn bisect3_le() {
         // Use less-than-or-equal if value should be inserted after equal values
-        assert_eq!(super::insertion_point(&4, &[2, 4, 6], &mut i32::le), Some(2))
+        assert_eq!(super::insertion_point(&4, &[2, 4, 6], &mut i32::le), (2, 3))
     }
     #[test]
     fn bisect3_after() {
-        assert_eq!(super::insertion_point(&7, &[2, 4, 6], &mut i32::lt), None)
-    }
-
-    #[test]
-    fn bisect3_2pow() {
-        let s = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
-        let mut profile = Vec::new();
-        for v in 0 .. s.len() + 1 {
-            let mut count = 0;
-            {
-                assert_eq!(
-                    super::insertion_point(&v, &s, &mut |&a, &b|{count += 1; a < b}).unwrap_or(s.len()),
-                    v
-                );
-            }
-            profile.push(count);
-        }
-        assert_eq!(profile, vec![2, 5, 5, 5, 5, 5, 5, 4, 5, 5, 5, 5, 5, 5, 5, 5, 2])
+        assert_eq!(super::insertion_point(&7, &[2, 4, 6], &mut i32::lt), (3, 3))
     }
 
     #[test]
     fn bisect3_2powm1() {
         let s = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14];
+        let slen = s.len();
+        let mut profile = Vec::new();
+        for v in 0 .. slen + 1 {
+            let mut count = 0;
+            {
+                assert_eq!(
+                    super::insertion_point(&v, &s, &mut |&a, &b|{count += 1; a < b}),
+                    (v, slen)
+                );
+            }
+            profile.push(count);
+        }
+        assert_eq!(profile, vec![4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4])
+    }
+
+    #[test]
+    fn bisect3_2pow() {
+        let s = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
+        let slen = s.len();
         let mut profile = Vec::new();
         for v in 0 .. s.len() + 1 {
             let mut count = 0;
             {
                 assert_eq!(
-                    super::insertion_point(&v, &s, &mut |&a, &b|{count += 1; a < b}).unwrap_or(s.len()),
-                    v
+                    super::insertion_point(&v, &s, &mut |&a, &b|{count += 1; a < b}),
+                    (v, slen)
                 );
             }
             profile.push(count);
         }
-        assert_eq!(profile, vec![2, 5, 5, 5, 5, 5, 5, 4, 5, 5, 5, 5, 5, 5, 4, 2])
+        assert_eq!(profile, vec![1, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5])
     }
 
     #[test]
     fn bisect3_2powp1() {
         let s = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16];
+        let slen = s.len();
         let mut profile = Vec::new();
-        for v in 0 .. s.len() + 1 {
+        for v in 0 .. slen + 1 {
             let mut count = 0;
             {
                 assert_eq!(
-                    super::insertion_point(&v, &s, &mut |&a, &b|{count += 1; a < b}).unwrap_or(s.len()),
-                    v
+                    super::insertion_point(&v, &s, &mut |&a, &b|{count += 1; a < b}),
+                    (v, slen)
                 );
             }
             profile.push(count);
         }
-        assert_eq!(profile, vec![2, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 2])
+        assert_eq!(profile, vec![2, 2, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5])
     }
 
     #[test]
     fn bisect3_20() {
         let s = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19];
+        let slen = s.len();
         let mut profile = Vec::new();
-        for v in 0 .. s.len() + 1 {
+        for v in 0 .. slen + 1 {
             let mut count = 0;
             {
                 assert_eq!(
-                    super::insertion_point(&v, &s, &mut |&a, &b|{count += 1; a < b}).unwrap_or(s.len()),
-                    v
+                    super::insertion_point(&v, &s, &mut |&a, &b|{count += 1; a < b}),
+                    (v, slen)
                 );
             }
             profile.push(count);
         }
-        assert_eq!(profile, vec![2, 6, 6, 5, 5, 5, 5, 5, 5, 5, 6, 6, 5, 5, 5, 6, 6, 5, 5, 5, 2])
+        assert_eq!(profile, vec![2, 4, 4, 4, 4, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5])
     }
 
+    #[test]
+    fn bisect3_21() {
+        let s = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20];
+        let slen = s.len();
+        let mut profile = Vec::new();
+        for v in 0 .. slen + 1 {
+            let mut count = 0;
+            {
+                assert_eq!(
+                    super::insertion_point(&v, &s, &mut |&a, &b|{count += 1; a < b}),
+                    (v, slen)
+                );
+            }
+            profile.push(count);
+        }
+        assert_eq!(profile, vec![3, 3, 4, 4, 4, 4, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5])
+    }
 
     #[test]
     fn swap_sequence_adjacent() {
