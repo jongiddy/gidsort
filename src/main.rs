@@ -3,6 +3,38 @@ extern crate gcd;
 use gcd::Gcd;
 
 
+fn split_biased(n: usize) -> usize {
+    // Return a split point that ensures that the RHS is a balanced binary tree.  A balanced binary
+    // tree contains 2^k - 1 nodes. Hence the length can be represented in binary by all-ones on
+    // the right (e.g. 15 = 00001111).  Masking off the leftmost 1 of this value gives 7 (00000111)
+    // a.k.a. 2^(k-1) - 1.
+    //
+    // Testing the value at position 7 tells us whether the next test should be on the 7 values
+    // below 7 (0-6) or the 7 values above 7 (8-14). This is the ideal binary search requiring
+    // log2 n tests for any search.
+    //
+    // Initially, we may get a sequence which has between 2^(k-1) and 2^k - 2 nodes, i.e. an
+    // unbalanced binary tree.  In this case, some of the branches may require fewer tests than
+    // others.  Since we are comparing the starts of sorted sequences, we would like to bias the
+    // selection of shorter branches to use fewer tests on the left side.
+    //
+    // This is done by ensuring the right side of the test still returns 2^(k-1) - 1 nodes and the
+    // left side gets the smaller sequence to test.  Conveniently, this is also achieved by masking
+    // off the highest 1 bit.  This technique gives us somewhat of an equivalent to galloping in
+    // other sorting algorithms.
+    //
+    // For example, a sequence of 21 elements has length 00010101.  Masking off the high 1 bit
+    // gives 00000101 = 5. If we test the value at position 5, the next test will either be 6-20
+    // (15 values, a balanced binary tree requiring 4 more tests) or 0-4 (5 values). Removing the
+    // leftmost bit of 6 (00000101) gives 1.  Testing 1 wi1l make the next test 2-4 (3 values, a
+    // balanced binary tree requiring 2 more tests) or 0, requiring 1 additional test.  Hence, the
+    // rightmost values require 5 tests, the leftmost value requires 3 tests, and other low values
+    // require 4 tests.
+
+    let mask = (1 as usize).rotate_right(n.leading_zeros() + 1);
+    n & !mask
+}
+
 fn insertion_point<T, F>(value: &T, buffer: &[T], before: &mut F) -> Option<usize>
     where
         F: FnMut(&T, &T) -> bool
@@ -210,6 +242,46 @@ fn main() {
 #[cfg(test)]
 mod tests {
     #[test]
+    fn split_biased_0() {
+        assert_eq!(super::split_biased(0), 0);
+    }
+
+    #[test]
+    fn split_biased_1() {
+        assert_eq!(super::split_biased(1), 0);
+    }
+
+    #[test]
+    fn split_biased_2() {
+        assert_eq!(super::split_biased(2), 0);
+    }
+
+    #[test]
+    fn split_biased_3() {
+        assert_eq!(super::split_biased(3), 1);
+    }
+
+    #[test]
+    fn split_biased_2powm1() {
+        assert_eq!(super::split_biased(31), 15);
+    }
+
+    #[test]
+    fn split_biased_2pow() {
+        assert_eq!(super::split_biased(32), 0);
+    }
+
+    #[test]
+    fn split_biased_2powp1() {
+        assert_eq!(super::split_biased(33), 1);
+    }
+
+    #[test]
+    fn split_biased_10101() {
+        assert_eq!(super::split_biased(21), 5)
+    }
+
+    #[test]
     fn bisect0() {
         assert_eq!(super::insertion_point(&3, &[], &mut i32::lt), None)
     }
@@ -256,13 +328,16 @@ mod tests {
     }
 
     #[test]
-    fn bisect3_even() {
-        let s = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16];
+    fn bisect3_2pow() {
+        let s = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
         let mut profile = Vec::new();
-        for v in 1 .. 18 {
+        for v in 0 .. s.len() + 1 {
             let mut count = 0;
             {
-                super::insertion_point(&v, &s, &mut |&a, &b|{count += 1; a < b});
+                assert_eq!(
+                    super::insertion_point(&v, &s, &mut |&a, &b|{count += 1; a < b}).unwrap_or(s.len()),
+                    v
+                );
             }
             profile.push(count);
         }
@@ -270,18 +345,56 @@ mod tests {
     }
 
     #[test]
-    fn bisect3_odd() {
-        let s = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
+    fn bisect3_2powm1() {
+        let s = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14];
         let mut profile = Vec::new();
-        for v in 1 .. 17 {
+        for v in 0 .. s.len() + 1 {
             let mut count = 0;
             {
-                super::insertion_point(&v, &s, &mut |&a, &b|{count += 1; a < b});
+                assert_eq!(
+                    super::insertion_point(&v, &s, &mut |&a, &b|{count += 1; a < b}).unwrap_or(s.len()),
+                    v
+                );
             }
             profile.push(count);
         }
         assert_eq!(profile, vec![2, 5, 5, 5, 5, 5, 5, 4, 5, 5, 5, 5, 5, 5, 4, 2])
     }
+
+    #[test]
+    fn bisect3_2powp1() {
+        let s = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16];
+        let mut profile = Vec::new();
+        for v in 0 .. s.len() + 1 {
+            let mut count = 0;
+            {
+                assert_eq!(
+                    super::insertion_point(&v, &s, &mut |&a, &b|{count += 1; a < b}).unwrap_or(s.len()),
+                    v
+                );
+            }
+            profile.push(count);
+        }
+        assert_eq!(profile, vec![2, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 2])
+    }
+
+    #[test]
+    fn bisect3_20() {
+        let s = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19];
+        let mut profile = Vec::new();
+        for v in 0 .. s.len() + 1 {
+            let mut count = 0;
+            {
+                assert_eq!(
+                    super::insertion_point(&v, &s, &mut |&a, &b|{count += 1; a < b}).unwrap_or(s.len()),
+                    v
+                );
+            }
+            profile.push(count);
+        }
+        assert_eq!(profile, vec![2, 6, 6, 5, 5, 5, 5, 5, 5, 5, 6, 6, 5, 5, 5, 6, 6, 5, 5, 5, 2])
+    }
+
 
     #[test]
     fn swap_sequence_adjacent() {
