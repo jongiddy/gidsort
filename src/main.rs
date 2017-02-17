@@ -93,10 +93,11 @@ fn rotate<T>(s: &mut [T], k: usize) {
     }
 }
 
-fn merge<T, F>(mut s: &mut [T], split: usize, mut lt: F, mut le: F)
+fn merge<T, F, G>(mut s: &mut [T], split: usize, lt: &mut F, le: &mut G)
     where
         T: Ord,
-        F: FnMut(&T, &T) -> bool
+        F: FnMut(&T, &T) -> bool,
+        G: FnMut(&T, &T) -> bool
 {
     // The slice to be sorted is divided into S0 | L | M | R | S1
     // The indexes into the slice are l0, l1, r0, r1
@@ -107,7 +108,7 @@ fn merge<T, F>(mut s: &mut [T], split: usize, mut lt: F, mut le: F)
     while l1 - l0 > 1 && r1 - r0 > 1 {
         assert!(l1 == r0);  // M is empty
         // Find r0 in L
-        let (pos, length) = insertion_point(&s[r0], &s[l0 .. l1], &mut le);
+        let (pos, length) = insertion_point(&s[r0], &s[l0 .. l1], le);
         if pos == length {
             // r0 > lmax - done
             return
@@ -120,7 +121,7 @@ fn merge<T, F>(mut s: &mut [T], split: usize, mut lt: F, mut le: F)
         }
         while l0 < l1 && l1 < r0 && r0 < r1 {
             // While L, M, and R exist, find insertion point of M[0] in R
-            let (pos, length) = insertion_point(&s[l1], &s[r0 .. r1], &mut lt);
+            let (pos, length) = insertion_point(&s[l1], &s[r0 .. r1], lt);
             if pos == length {
                 // R < M < L
                 // LMR -> RML
@@ -186,23 +187,24 @@ fn merge<T, F>(mut s: &mut [T], split: usize, mut lt: F, mut le: F)
         }
         // if M exists, but L doesn't, L=M
     }
-    if l1 - l0 == 1 {
+    if l1 - l0 == 1 && r1 - r0 > 0 {
         // |L| = 1: Just insert it into R
-        let (pos, length) = insertion_point(&s[l0], &s[r0 .. r1], &mut lt);
+        let (pos, length) = insertion_point(&s[l0], &s[r0 .. r1], lt);
         if pos == length {
             rotate(&mut s[l0 .. r1], r1 - r0);
         } else if pos != 0 {
             rotate(&mut s[l0 .. r0 + pos], pos);
         }
         // else already in position
-    } else if r1 - r0 == 1 {
+    } else if r1 - r0 == 1 && l1 - l0 > 0 {
         // |R| = 1: Just insert it into L
-        let (pos, length) = insertion_point(&s[r0], &s[l0 .. l1], &mut le);
+        let (pos, length) = insertion_point(&s[r0], &s[l0 .. l1], le);
         if pos < length {
             rotate(&mut s[l0 + pos .. r1], 1);
         }
         // else already in position
-    } // at least one of |L| and |R| == 0
+    }
+    // at least one of |L| and |R| == 0
 }
 
 #[cfg(not(test))]
@@ -213,6 +215,96 @@ fn main() {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn merge_0() {
+        let mut s: [i32; 0] = [];
+        let mut count_lt = 0;
+        let mut count_le = 0;
+        super::merge(
+            &mut s, 0, &mut |&a, &b|{count_lt += 1; a < b}, &mut |&a, &b|{count_le += 1; a <= b}
+        );
+        assert_eq!(count_lt + count_le, 0);
+    }
+
+    #[test]
+    fn merge_0_1() {
+        let mut s = [1];
+        let mut count_lt = 0;
+        let mut count_le = 0;
+        super::merge(
+            &mut s, 0, &mut |&a, &b|{count_lt += 1; a < b}, &mut |&a, &b|{count_le += 1; a <= b}
+        );
+        assert_eq!(count_lt + count_le, 0);
+        assert_eq!(s[0], 1);
+    }
+
+    #[test]
+    fn merge_1_0() {
+        let mut s = [1];
+        let mut count_lt = 0;
+        let mut count_le = 0;
+        super::merge(
+            &mut s, 1, &mut |&a, &b|{count_lt += 1; a < b}, &mut |&a, &b|{count_le += 1; a <= b}
+        );
+        assert_eq!(count_lt + count_le, 0);
+        assert_eq!(s[0], 1);
+    }
+
+    #[test]
+    fn merge_1_1_ordered() {
+        let mut s = [1, 2];
+        let mut count_lt = 0;
+        let mut count_le = 0;
+        super::merge(
+            &mut s, 1, &mut |&a, &b|{count_lt += 1; a < b}, &mut |&a, &b|{count_le += 1; a <= b}
+        );
+        assert_eq!(count_lt + count_le, 1);
+        assert_eq!(s[0], 1);
+        assert_eq!(s[1], 2);
+    }
+
+    #[test]
+    fn merge_1_1_unordered() {
+        let mut s = [2, 1];
+        let mut count_lt = 0;
+        let mut count_le = 0;
+        super::merge(
+            &mut s, 1, &mut |&a, &b|{count_lt += 1; a < b}, &mut |&a, &b|{count_le += 1; a <= b}
+        );
+        assert_eq!(count_lt + count_le, 1);
+        assert_eq!(s[0], 1);
+        assert_eq!(s[1], 2);
+    }
+
+    #[test]
+    fn merge_1_n() {
+        let mut s = [7, 0, 1, 2, 3, 4, 5, 6, 8, 9, 10];
+        let mut count_lt = 0;
+        let mut count_le = 0;
+        super::merge(
+            &mut s, 1, &mut |&a, &b|{count_lt += 1; a < b}, &mut |&a, &b|{count_le += 1; a <= b}
+        );
+        assert_eq!(count_lt + count_le, 4);
+        for (i, elem) in s.iter().enumerate() {
+            assert_eq!(*elem, i);
+        }
+    }
+
+    #[test]
+    fn merge_n_1() {
+        let mut s = [0, 1, 2, 3, 4, 5, 6, 8, 9, 10, 7];
+        let mut count_lt = 0;
+        let mut count_le = 0;
+        let leftlen = s.len() - 1;
+        super::merge(
+            &mut s, leftlen, &mut |&a, &b|{count_lt += 1; a < b}, &mut |&a, &b|{count_le += 1; a <= b}
+        );
+        assert_eq!(count_lt + count_le, 4);
+        for (i, elem) in s.iter().enumerate() {
+            assert_eq!(*elem, i);
+        }
+    }
+
     #[test]
     fn split_biased_0() {
         assert_eq!(super::split_biased(0), 0);
@@ -455,5 +547,4 @@ mod tests {
         super::rotate(&mut buf, 6);
         assert_eq!(buf, [16, 17, 18, 19, 20, 21, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]);
     }
-
 }
