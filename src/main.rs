@@ -253,50 +253,54 @@ mod tests {
         assert_eq!(super::split_biased(21), 5)
     }
 
+    // A non-copy but comparable type is useful for testing, as bad moves are hidden by Copy types.
+    #[derive(PartialEq,Eq,PartialOrd,Ord)]
+    struct Nc(i32);
+
     #[test]
     fn bisect0() {
-        assert_eq!(super::insertion_point(&3, &[], &mut i32::lt), (0, 0))
+        assert_eq!(super::insertion_point(&Nc(3), &[], &mut Nc::lt), (0, 0))
     }
 
     #[test]
     fn bisect1_before() {
-        assert_eq!(super::insertion_point(&1, &[2], &mut i32::lt), (0, 1))
+        assert_eq!(super::insertion_point(&Nc(1), &[Nc(2)], &mut Nc::lt), (0, 1))
     }
     #[test]
     fn bisect1_after() {
-        assert_eq!(super::insertion_point(&3, &[2], &mut i32::lt), (1, 1))
+        assert_eq!(super::insertion_point(&Nc(3), &[Nc(2)], &mut Nc::lt), (1, 1))
     }
 
     #[test]
     fn bisect2_before() {
-        assert_eq!(super::insertion_point(&1, &[2, 4], &mut i32::lt), (0, 2))
+        assert_eq!(super::insertion_point(&Nc(1), &[Nc(2), Nc(4)], &mut Nc::lt), (0, 2))
     }
     #[test]
     fn bisect2_middle() {
-        assert_eq!(super::insertion_point(&3, &[2, 4], &mut i32::lt), (1, 2))
+        assert_eq!(super::insertion_point(&Nc(3), &[Nc(2), Nc(4)], &mut Nc::lt), (1, 2))
     }
     #[test]
     fn bisect2_after() {
-        assert_eq!(super::insertion_point(&5, &[2, 4], &mut i32::lt), (2, 2))
+        assert_eq!(super::insertion_point(&Nc(5), &[Nc(2), Nc(4)], &mut Nc::lt), (2, 2))
     }
 
     #[test]
     fn bisect3_before() {
-        assert_eq!(super::insertion_point(&1, &[2, 4, 6], &mut i32::lt), (0, 3))
+        assert_eq!(super::insertion_point(&Nc(1), &[Nc(2), Nc(4), Nc(6)], &mut Nc::lt), (0, 3))
     }
     #[test]
     fn bisect3_lt() {
         // Use less-than if the value should be inserted before equal values
-        assert_eq!(super::insertion_point(&4, &[2, 4, 6], &mut i32::lt), (1, 3))
+        assert_eq!(super::insertion_point(&Nc(4), &[Nc(2), Nc(4), Nc(6)], &mut Nc::lt), (1, 3))
     }
     #[test]
     fn bisect3_le() {
         // Use less-than-or-equal if value should be inserted after equal values
-        assert_eq!(super::insertion_point(&4, &[2, 4, 6], &mut i32::le), (2, 3))
+        assert_eq!(super::insertion_point(&Nc(4), &[Nc(2), Nc(4), Nc(6)], &mut Nc::le), (2, 3))
     }
     #[test]
     fn bisect3_after() {
-        assert_eq!(super::insertion_point(&7, &[2, 4, 6], &mut i32::lt), (3, 3))
+        assert_eq!(super::insertion_point(&Nc(7), &[Nc(2), Nc(4), Nc(6)], &mut Nc::lt), (3, 3))
     }
 
     #[test]
