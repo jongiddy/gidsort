@@ -107,18 +107,39 @@ fn merge<T, F, G>(mut s: &mut [T], split: usize, lt: &mut F, le: &mut G)
     let mut r1 = s.len();
     while l1 - l0 > 1 && r1 - r0 > 1 {
         assert!(l1 == r0);  // M is empty
-        // Find r0 in L
-        let (pos, length) = insertion_point(&s[r0], &s[l0 .. l1], le);
-        if pos == length {
-            // r0 > lmax - done
-            return
-        } else {
-            // swap values, and add l_pos into M
-            let l_pos = l0 + pos;
-            s.swap(l_pos, r0);
-            l0 = l_pos + 1;
-            r0 += 1;
+
+        // Find all R values > l_max, to shrink R quickly
+        let (pos, _) = insertion_point(&s[l1 - 1], &s[r0 .. r1], lt);
+        if pos == 0 {
+            // lmax < r0 - done
+            return;
         }
+        r1 = r0 + pos;
+        // l_last is largest value
+
+        // Find all L values < r0, to shrink L quickly
+        let (pos, _) = insertion_point(&s[r0], &s[l0 .. l1 - 1], le);
+        l0 += pos;
+        // r0 is smallest value
+
+        // If one value on either side, we know final order
+        if r1 - r0 == 1 {
+            rotate(&mut s[l0 .. r1], 1);
+            return;
+        }
+        if l1 - l0 == 1 {
+            rotate(&mut s[l0 .. r1], r1 - r0);
+            return;
+        }
+
+        panic!("Not implemented");
+        if l1 - l0 <= r1 - r0 {
+            // |L| <= |R|
+        } else {
+            // |L| > |R|
+        }
+
+
         while l0 < l1 && l1 < r0 && r0 < r1 {
             // While L, M, and R exist, find insertion point of M[0] in R
             let (pos, length) = insertion_point(&s[l1], &s[r0 .. r1], lt);
@@ -300,6 +321,21 @@ mod tests {
             &mut s, leftlen, &mut |&a, &b|{count_lt += 1; a < b}, &mut |&a, &b|{count_le += 1; a <= b}
         );
         assert_eq!(count_lt + count_le, 4);
+        for (i, elem) in s.iter().enumerate() {
+            assert_eq!(*elem, i);
+        }
+    }
+
+    #[test]
+    fn merge_ordered() {
+        let mut s = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
+        let mut count_lt = 0;
+        let mut count_le = 0;
+        let leftlen = s.len() / 2;
+        super::merge(
+            &mut s, leftlen, &mut |&a, &b|{count_lt += 1; a < b}, &mut |&a, &b|{count_le += 1; a <= b}
+        );
+        assert_eq!(count_lt + count_le, 1);
         for (i, elem) in s.iter().enumerate() {
             assert_eq!(*elem, i);
         }
