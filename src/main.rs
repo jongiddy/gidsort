@@ -105,40 +105,78 @@ fn merge<T, F, G>(mut s: &mut [T], split: usize, lt: &mut F, le: &mut G)
     let mut l1 = split;
     let mut r0 = split;
     let mut r1 = s.len();
-    while l1 - l0 > 1 && r1 - r0 > 1 {
-        assert!(l1 == r0);  // M is empty
 
-        // Find all R values > l_max, to shrink R quickly
-        let (pos, _) = insertion_point(&s[l1 - 1], &s[r0 .. r1], lt);
-        if pos == 0 {
-            // lmax < r0 - done
-            return;
-        }
-        r1 = r0 + pos;
-        // l_last is largest value
+    let llen = l1 - l0;
+    let rlen = r1 - r0;
 
-        // Find all L values < r0, to shrink L quickly
-        let (pos, _) = insertion_point(&s[r0], &s[l0 .. l1 - 1], le);
-        l0 += pos;
-        // r0 is smallest value
+    if llen == 0 || rlen == 0 {
+        return;
+    }
+    if llen == 1 {
+        // |L| = 1: Just insert it into R
+        let (pos, _) = insertion_point(&s[l0], &s[r0 .. r1], lt);
+        rotate(&mut s[l0 .. r0 + pos], pos);
+        return;
+    }
+    if rlen == 1 {
+        // |R| = 1: Just insert it into L
+        let (pos, _) = insertion_point(&s[r0], &s[l0 .. l1], le);
+        rotate(&mut s[l0 + pos .. r1], 1);
+        return;
+    }
 
-        // If one value on either side, we know final order
-        if r1 - r0 == 1 {
-            rotate(&mut s[l0 .. r1], 1);
-            return;
-        }
-        if l1 - l0 == 1 {
-            rotate(&mut s[l0 .. r1], r1 - r0);
-            return;
-        }
+    // R may contain values that are higher than l_max.  These values are already in their final
+    // position, so we can move them from R to S1.
+    let (pos, _) = insertion_point(&s[l1 - 1], &s[r0 .. r1], lt);
+    if pos == 0 {
+        // l_max < r_0 -> L-R is already sorted
+        //
+        // Although this code is shrinking the size of the sequence and setting up a useful
+        // invariant, it also provides a third behaviour which is useful when this function is
+        // called as part of a mergesort, which typically merges blocks of size 2^n.
+        // Since that is one more 2^n - 1, the size of a balanced binary tree, `split_biased` must
+        // use a tree of size 2^(n+1) - 1, and since it is biased to the left, only one comparison
+        // is required to check the value against the first point of the sequence.  This means
+        // already sorted sequences are merged with one comparison, and an entire mergesort of
+        // already sorted data will take the minimum possible (n-1) comparisons.  This is useful
+        // because much real data is close to already sorted, so optimising this case is valuable.
+        // Many other real-world sorts special-case for already sorted data.  In our case, the
+        // single comparison is performed without affecting the worst-case performance on random
+        // data.  See the test `bisect3_2pow` for an example.  In the test, /some/ of the paths
+        // must require 5 comparisons.  We bias the algorithm so that one common path is
+        // significantly advantaged at the cost of /all/ other paths requiring 5 comparisons.
+        return;
+    }
+    r1 = r0 + pos;
+    // l_max is largest value
 
-        panic!("Not implemented");
-        if l1 - l0 <= r1 - r0 {
-            // |L| <= |R|
-        } else {
-            // |L| > |R|
-        }
+    // L may contain values that are lower than r_0.  These values are already in their final
+    // position, so we can move them from L to S0.  Note, we ignore l_max since we know it is
+    // larger than r_0.  This is why we don't need to test whether |L| = 0.
+    let (pos, _) = insertion_point(&s[r0], &s[l0 .. l1 - 1], le);
+    l0 += pos;
+    // r0 is smallest value
 
+    if l1 - l0 == 1 || r1 - r0 == 1 {
+        // since r_0 is smallest value, if |R| = 1, we just need to swap L and R
+        // since l_max is largest value, if |L| = 1, we just need to swap L and R
+        rotate(&mut s[l0 .. r1], r1 - r0);
+        return;
+    }
+
+    // At this point, we have set up several invariants:
+    // 1. r_0 is smallest value
+    // 2. l_max is largest value
+    debug_assert!(l1 - l0 > 1);   // 3. |L| > 1
+    debug_assert!(l1 == r0);      // 4. M is empty
+    debug_assert!(r1 - r0 > 1);   // 5. |R| > 1
+
+    panic!("Not implemented");
+    if l1 - l0 <= r1 - r0 {
+        // |L| <= |R|
+    } else {
+        // |L| > |R|
+    }
 
         while l0 < l1 && l1 < r0 && r0 < r1 {
             // While L, M, and R exist, find insertion point of M[0] in R
@@ -207,25 +245,6 @@ fn merge<T, F, G>(mut s: &mut [T], split: usize, lt: &mut F, le: &mut G)
             // }
         }
         // if M exists, but L doesn't, L=M
-    }
-    if l1 - l0 == 1 && r1 - r0 > 0 {
-        // |L| = 1: Just insert it into R
-        let (pos, length) = insertion_point(&s[l0], &s[r0 .. r1], lt);
-        if pos == length {
-            rotate(&mut s[l0 .. r1], r1 - r0);
-        } else if pos != 0 {
-            rotate(&mut s[l0 .. r0 + pos], pos);
-        }
-        // else already in position
-    } else if r1 - r0 == 1 && l1 - l0 > 0 {
-        // |R| = 1: Just insert it into L
-        let (pos, length) = insertion_point(&s[r0], &s[l0 .. l1], le);
-        if pos < length {
-            rotate(&mut s[l0 + pos .. r1], 1);
-        }
-        // else already in position
-    }
-    // at least one of |L| and |R| == 0
 }
 
 #[cfg(not(test))]
