@@ -164,87 +164,44 @@ fn merge<T, F, G>(mut s: &mut [T], split: usize, lt: &mut F, le: &mut G)
         return;
     }
 
-    // At this point, we have set up several invariants:
-    // 1. r_0 is smallest value
-    // 2. l_max is largest value
-    debug_assert!(l1 - l0 > 1);   // 3. |L| > 1
-    debug_assert!(l1 == r0);      // 4. M is empty
-    debug_assert!(r1 - r0 > 1);   // 5. |R| > 1
+    loop {
+        // At this point, we have several invariants:
+        debug_assert!(lt(&s[r0], &s[l0]));           // 1. r_0 is smallest value
+        debug_assert!(lt(&s[r1 - 1], &s[l1 - 1]));   // 2. l_max is largest value
+        debug_assert!(l1 - l0 > 1);                 // 3. |L| > 1
+        debug_assert!(l1 == r0);                    // 4. M is empty
+        debug_assert!(r1 - r0 > 1);                 // 5. |R| > 1
 
-    panic!("Not implemented");
-    if l1 - l0 <= r1 - r0 {
-        // |L| <= |R|
-    } else {
-        // |L| > |R|
-    }
-
-        while l0 < l1 && l1 < r0 && r0 < r1 {
-            // While L, M, and R exist, find insertion point of M[0] in R
-            let pos = insertion_point(&s[l1], &s[r0 .. r1], lt);
-            if pos == r1 - r0 {
-                // R < M < L
-                // LMR -> RML
-                // first, swap min(|L|,|R|) to make:
-                // Ra | Lb | Ma La | Rb, one of Lb or Rb is empty
-                // then, if Lb is empty, rotate Ma-La-Rb to Rb-Ma-La, return
-                // else rotate Lb-Ma-La to Ma-La-Lb, return
-                let llen = l1 - l0;
-                let rlen = r1 - r0;
-                // TODO - remove if with:
-                // let maxlen = max(llen, rlen);
-                // let minlen = min(llen, rlen);
-                // swap_sequence(&mut s, l0, r0, minlen);
-                // l0 += minlen;
-                // r0 += minlen;
-                // rotate(&mut s[l0 .. r1], maxlen - minlen);
-                if llen < rlen {
-                    swap_sequence(&mut s, l0, r0, llen);
-                    l0 += llen;
-                    // r0 += llen;
-                    rotate(&mut s[l0 .. r1], rlen - llen);
-                } else {
-                    swap_sequence(&mut s, l0, r0, rlen);
-                    l0 += rlen;
-                    // r0 += rlen;
-                    rotate(&mut s[l0 .. r1], llen - rlen);
-                }
-                return
-            } else {
-                // L-M-R0..pos-Rpos..
-                //swap L/R to min |L|, pos
-                // R0-L1-M-L0-R0x-R1, either L1 is empty or R0x is empty
-                // if L1 is empty, rotate M-L0-R0x to R0x-M-L0, R0-R0x-M[0] => S, M->L
-                // else R0-L1-M-L0-R1
-                let llen = l1 - l0;
-                if llen < pos {
-                    swap_sequence(&mut s, l0, r0, llen);
-                    // L is empty
-                    rotate(&mut s[l1 .. r0 + pos], pos - llen);
-                    l0 += pos + 1; // Ra + M0
-                    l1 = r0 + pos;
-                    r0 = l1;
-                } else {
-                    swap_sequence(&mut s, l0, r0, pos);
-                    // find where R0 goes in M-L0. If None, then rotate L1-M-L0 -> M-L0-L1
-                    // else rotate L1 and M < R0. Then swap R0 and L1,0.
-                    // or insertion sort R0 into M
-                }
-            }
-            // match insertion_point(&s[r0], &s[l1 .. r0], le) {
-            //     None => {
-            //         // all of M goes before R
-            //         // if |L| < |M|, rotate L-M, no more M
-            //         // else
-            //         // swap L-M, keep M
-            //     }
-            //     Some(pos) => {
-            //         // L0-L1-M0-M1-R
-            //         // if |L| < |M0|, rotate L-M0 to M0-L, no more M
-            //         // else swap L0/M0, keep M, assert R[0] < M[0]
-            //     }
-            // }
+        // One or more elements at the start of R are smaller than L.  Find out how many elements,
+        // and move them to the space at the start of L. Shift all the L elements to the right.
+        // S0 | L | R | S1 - split R < l_0
+        // S0 | L | R0 | R1 | S1 - split L < R1_0
+        // S0 | L0 | L1 | R0 | R1 | S1 - rotate L0-L1-R0 to R0-L0-L1
+        // S0 | R0 | L0 | L1 | R1 | S1 - R0 and L0 are in order, add to S0; L1 becomes M
+        // S0 | L1 | R1 | S1 - R0 and L0 are in order, add to S0
+        let pos = insertion_point(&s[l0], &s[r0 + 1 .. r1], lt);
+        let rsplit = r0 + 1 + pos;
+        if rsplit == r1 {
+            // all of R < all of L
+            rotate(&mut s[l0 .. r1], r1 - r0);
+            return;
         }
-        // if M exists, but L doesn't, L=M
+        // from above we know that l_0 < r_split, and invariant l_max > r_* still holds,
+        // so we can take off the two endpoints of L
+        debug_assert!(l0 + 1 <= l1 - 1);  // invariant |L| > 1 must be true
+        let pos = insertion_point(&s[rsplit], &s[l0 + 1 .. l1 - 1], le);
+        let lsplit = l0 + 1 + pos;
+        rotate(&mut s[l0 .. rsplit], rsplit - r0);
+        l0 = lsplit + rsplit - r0;  // add R0 and L0 to S0
+        r0 = rsplit;
+        l1 = r0;
+        if l1 - l0 == 1 || r1 - r0 == 1 {
+            // since r_0 is smallest value, if |R| = 1, we just need to swap L and R
+            // since l_max is largest value, if |L| = 1, we just need to swap L and R
+            rotate(&mut s[l0 .. r1], r1 - r0);
+            return;
+        }
+    }
 }
 
 #[cfg(not(test))]
@@ -255,6 +212,10 @@ fn main() {
 
 #[cfg(test)]
 mod tests {
+    // A non-copy but comparable type is useful for testing, as bad moves are hidden by Copy types.
+    #[derive(PartialEq,Eq,PartialOrd,Ord,Debug)]
+    struct Nc(i32);
+
     #[test]
     fn merge_0() {
         let mut s: [i32; 0] = [];
@@ -361,6 +322,19 @@ mod tests {
     }
 
     #[test]
+    fn merge_alternative() {
+        let mut s = [
+            Nc(0), Nc(2), Nc(4), Nc(6), Nc(8), Nc(10), Nc(12), Nc(14),
+            Nc(1), Nc(3), Nc(5), Nc(7), Nc(9), Nc(11), Nc(13), Nc(15)
+        ];
+        let leftlen = s.len() / 2;
+        super::merge(&mut s, leftlen, &mut Nc::lt, &mut Nc::le);
+        for (i, elem) in s.iter().enumerate() {
+            assert_eq!(*elem, Nc(i as i32));
+        }
+    }
+
+    #[test]
     fn split_biased_0() {
         assert_eq!(super::split_biased(0), 0);
     }
@@ -399,10 +373,6 @@ mod tests {
     fn split_biased_10101() {
         assert_eq!(super::split_biased(21), 5)
     }
-
-    // A non-copy but comparable type is useful for testing, as bad moves are hidden by Copy types.
-    #[derive(PartialEq,Eq,PartialOrd,Ord)]
-    struct Nc(i32);
 
     #[test]
     fn bisect0() {
