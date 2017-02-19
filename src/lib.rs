@@ -5,6 +5,9 @@ use std::cmp::Ordering;
 
 use gcd::Gcd;
 
+#[cfg(test)]
+#[macro_use]
+extern crate quickcheck;
 
 fn split_biased(n: usize) -> usize {
     // Return a split point that ensures that the RHS is a balanced binary tree.  A balanced binary
@@ -629,5 +632,25 @@ mod tests {
         let mut buf = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21];
         super::rotate(&mut buf, 6);
         assert_eq!(buf, [16, 17, 18, 19, 20, 21, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]);
+    }
+
+    quickcheck! {
+        fn sort_i32(vec: Vec<i32>) -> bool {
+            let mut s = vec.clone();
+            super::sort(&mut s);
+            s.windows(2).all(|v| v[0] <= v[1])
+        }
+
+        fn sort_char(vec: Vec<char>) -> bool {
+            let mut s = vec.clone();
+            super::sort(&mut s);
+            s.windows(2).all(|v| v[0] <= v[1])
+        }
+
+        fn sort_str(vec: Vec<String>) -> bool {
+            let mut s = vec.clone();
+            super::sort(&mut s);
+            s.windows(2).all(|v| v[0] <= v[1])
+        }
     }
 }
