@@ -35,9 +35,9 @@ fn split_biased(n: usize) -> usize {
     n & !mask
 }
 
-fn insertion_point<T, F>(value: &T, buffer: &[T], before: &mut F) -> usize
+fn insertion_point<T, F>(value: &T, buffer: &[T], before: &F) -> usize
     where
-        F: FnMut(&T, &T) -> bool
+        F: Fn(&T, &T) -> bool
 {
     // Find the insertion point where the value would fit
     // All elements to the left of the insertion point are "before" the value
@@ -93,11 +93,11 @@ fn rotate<T>(s: &mut [T], k: usize) {
     }
 }
 
-fn merge<T, F, G>(mut s: &mut [T], split: usize, lt: &mut F, le: &mut G)
+fn merge<T, F, G>(mut s: &mut [T], split: usize, lt: &F, le: &G)
     where
         T: Ord,
-        F: FnMut(&T, &T) -> bool,
-        G: FnMut(&T, &T) -> bool
+        F: Fn(&T, &T) -> bool,
+        G: Fn(&T, &T) -> bool
 {
     // The slice to be sorted is divided into S0 | L | M | R | S1
     // The indexes into the slice are l0, l1, r0, r1
@@ -207,11 +207,13 @@ fn merge<T, F, G>(mut s: &mut [T], split: usize, lt: &mut F, le: &mut G)
 #[cfg(not(test))]
 fn main() {
     let mut a = vec![2, 4, 6, 1, 3, 5];
-    merge(&mut a, 3, &mut i32::lt, &mut i32::le)
+    merge(&mut a, 3, &i32::lt, &i32::le)
 }
 
 #[cfg(test)]
 mod tests {
+    use std::cell::Cell;
+
     // A non-copy but comparable type is useful for testing, as bad moves are hidden by Copy types.
     #[derive(PartialEq,Eq,PartialOrd,Ord,Debug)]
     struct Nc(i32);
@@ -219,47 +221,43 @@ mod tests {
     #[test]
     fn merge_0() {
         let mut s: [i32; 0] = [];
-        let mut count_lt = 0;
-        let mut count_le = 0;
+        let count = Cell::new(0);
         super::merge(
-            &mut s, 0, &mut |&a, &b|{count_lt += 1; a < b}, &mut |&a, &b|{count_le += 1; a <= b}
+            &mut s, 0, &|&a, &b|{count.set(count.get() + 1); a < b}, &|&a, &b|{count.set(count.get() + 1); a <= b}
         );
-        assert_eq!(count_lt + count_le, 0);
+        assert_eq!(count.get(), 0);
     }
 
     #[test]
     fn merge_0_1() {
         let mut s = [1];
-        let mut count_lt = 0;
-        let mut count_le = 0;
+        let count = Cell::new(0);
         super::merge(
-            &mut s, 0, &mut |&a, &b|{count_lt += 1; a < b}, &mut |&a, &b|{count_le += 1; a <= b}
+            &mut s, 0, &|&a, &b|{count.set(count.get() + 1); a < b}, &|&a, &b|{count.set(count.get() + 1); a <= b}
         );
-        assert_eq!(count_lt + count_le, 0);
+        assert_eq!(count.get(), 0);
         assert_eq!(s[0], 1);
     }
 
     #[test]
     fn merge_1_0() {
         let mut s = [1];
-        let mut count_lt = 0;
-        let mut count_le = 0;
+        let count = Cell::new(0);
         super::merge(
-            &mut s, 1, &mut |&a, &b|{count_lt += 1; a < b}, &mut |&a, &b|{count_le += 1; a <= b}
+            &mut s, 1, &|&a, &b|{count.set(count.get() + 1); a < b}, &|&a, &b|{count.set(count.get() + 1); a <= b}
         );
-        assert_eq!(count_lt + count_le, 0);
+        assert_eq!(count.get(), 0);
         assert_eq!(s[0], 1);
     }
 
     #[test]
     fn merge_1_1_ordered() {
         let mut s = [1, 2];
-        let mut count_lt = 0;
-        let mut count_le = 0;
+        let count = Cell::new(0);
         super::merge(
-            &mut s, 1, &mut |&a, &b|{count_lt += 1; a < b}, &mut |&a, &b|{count_le += 1; a <= b}
+            &mut s, 1, &|&a, &b|{count.set(count.get() + 1); a < b}, &|&a, &b|{count.set(count.get() + 1); a <= b}
         );
-        assert_eq!(count_lt + count_le, 1);
+        assert_eq!(count.get(), 1);
         assert_eq!(s[0], 1);
         assert_eq!(s[1], 2);
     }
@@ -267,12 +265,11 @@ mod tests {
     #[test]
     fn merge_1_1_unordered() {
         let mut s = [2, 1];
-        let mut count_lt = 0;
-        let mut count_le = 0;
+        let count = Cell::new(0);
         super::merge(
-            &mut s, 1, &mut |&a, &b|{count_lt += 1; a < b}, &mut |&a, &b|{count_le += 1; a <= b}
+            &mut s, 1, &|&a, &b|{count.set(count.get() + 1); a < b}, &|&a, &b|{count.set(count.get() + 1); a <= b}
         );
-        assert_eq!(count_lt + count_le, 1);
+        assert_eq!(count.get(), 1);
         assert_eq!(s[0], 1);
         assert_eq!(s[1], 2);
     }
@@ -280,12 +277,11 @@ mod tests {
     #[test]
     fn merge_1_n() {
         let mut s = [7, 0, 1, 2, 3, 4, 5, 6, 8, 9, 10];
-        let mut count_lt = 0;
-        let mut count_le = 0;
+        let count = Cell::new(0);
         super::merge(
-            &mut s, 1, &mut |&a, &b|{count_lt += 1; a < b}, &mut |&a, &b|{count_le += 1; a <= b}
+            &mut s, 1, &|&a, &b|{count.set(count.get() + 1); a < b}, &|&a, &b|{count.set(count.get() + 1); a <= b}
         );
-        assert_eq!(count_lt + count_le, 4);
+        assert_eq!(count.get(), 4);
         for (i, elem) in s.iter().enumerate() {
             assert_eq!(*elem, i);
         }
@@ -294,13 +290,12 @@ mod tests {
     #[test]
     fn merge_n_1() {
         let mut s = [0, 1, 2, 3, 4, 5, 6, 8, 9, 10, 7];
-        let mut count_lt = 0;
-        let mut count_le = 0;
+        let count = Cell::new(0);
         let leftlen = s.len() - 1;
         super::merge(
-            &mut s, leftlen, &mut |&a, &b|{count_lt += 1; a < b}, &mut |&a, &b|{count_le += 1; a <= b}
+            &mut s, leftlen, &|&a, &b|{count.set(count.get() + 1); a < b}, &|&a, &b|{count.set(count.get() + 1); a <= b}
         );
-        assert_eq!(count_lt + count_le, 4);
+        assert_eq!(count.get(), 4);
         for (i, elem) in s.iter().enumerate() {
             assert_eq!(*elem, i);
         }
@@ -309,13 +304,12 @@ mod tests {
     #[test]
     fn merge_ordered() {
         let mut s = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
-        let mut count_lt = 0;
-        let mut count_le = 0;
+        let count = Cell::new(0);
         let leftlen = s.len() / 2;
         super::merge(
-            &mut s, leftlen, &mut |&a, &b|{count_lt += 1; a < b}, &mut |&a, &b|{count_le += 1; a <= b}
+            &mut s, leftlen, &|&a, &b|{count.set(count.get() + 1); a < b}, &|&a, &b|{count.set(count.get() + 1); a <= b}
         );
-        assert_eq!(count_lt + count_le, 1);
+        assert_eq!(count.get(), 1);
         for (i, elem) in s.iter().enumerate() {
             assert_eq!(*elem, i);
         }
@@ -328,7 +322,7 @@ mod tests {
             Nc(1), Nc(3), Nc(5), Nc(7), Nc(9), Nc(11), Nc(13), Nc(15)
         ];
         let leftlen = s.len() / 2;
-        super::merge(&mut s, leftlen, &mut Nc::lt, &mut Nc::le);
+        super::merge(&mut s, leftlen, &Nc::lt, &Nc::le);
         for (i, elem) in s.iter().enumerate() {
             assert_eq!(*elem, Nc(i as i32));
         }
@@ -376,48 +370,48 @@ mod tests {
 
     #[test]
     fn bisect0() {
-        assert_eq!(super::insertion_point(&Nc(3), &[], &mut Nc::lt), 0)
+        assert_eq!(super::insertion_point(&Nc(3), &[], &Nc::lt), 0)
     }
 
     #[test]
     fn bisect1_before() {
-        assert_eq!(super::insertion_point(&Nc(1), &[Nc(2)], &mut Nc::lt), 0)
+        assert_eq!(super::insertion_point(&Nc(1), &[Nc(2)], &Nc::lt), 0)
     }
     #[test]
     fn bisect1_after() {
-        assert_eq!(super::insertion_point(&Nc(3), &[Nc(2)], &mut Nc::lt), 1)
+        assert_eq!(super::insertion_point(&Nc(3), &[Nc(2)], &Nc::lt), 1)
     }
 
     #[test]
     fn bisect2_before() {
-        assert_eq!(super::insertion_point(&Nc(1), &[Nc(2), Nc(4)], &mut Nc::lt), 0)
+        assert_eq!(super::insertion_point(&Nc(1), &[Nc(2), Nc(4)], &Nc::lt), 0)
     }
     #[test]
     fn bisect2_middle() {
-        assert_eq!(super::insertion_point(&Nc(3), &[Nc(2), Nc(4)], &mut Nc::lt), 1)
+        assert_eq!(super::insertion_point(&Nc(3), &[Nc(2), Nc(4)], &Nc::lt), 1)
     }
     #[test]
     fn bisect2_after() {
-        assert_eq!(super::insertion_point(&Nc(5), &[Nc(2), Nc(4)], &mut Nc::lt), 2)
+        assert_eq!(super::insertion_point(&Nc(5), &[Nc(2), Nc(4)], &Nc::lt), 2)
     }
 
     #[test]
     fn bisect3_before() {
-        assert_eq!(super::insertion_point(&Nc(1), &[Nc(2), Nc(4), Nc(6)], &mut Nc::lt), 0)
+        assert_eq!(super::insertion_point(&Nc(1), &[Nc(2), Nc(4), Nc(6)], &Nc::lt), 0)
     }
     #[test]
     fn bisect3_lt() {
         // Use less-than if the value should be inserted before equal values
-        assert_eq!(super::insertion_point(&Nc(4), &[Nc(2), Nc(4), Nc(6)], &mut Nc::lt), 1)
+        assert_eq!(super::insertion_point(&Nc(4), &[Nc(2), Nc(4), Nc(6)], &Nc::lt), 1)
     }
     #[test]
     fn bisect3_le() {
         // Use less-than-or-equal if value should be inserted after equal values
-        assert_eq!(super::insertion_point(&Nc(4), &[Nc(2), Nc(4), Nc(6)], &mut Nc::le), 2)
+        assert_eq!(super::insertion_point(&Nc(4), &[Nc(2), Nc(4), Nc(6)], &Nc::le), 2)
     }
     #[test]
     fn bisect3_after() {
-        assert_eq!(super::insertion_point(&Nc(7), &[Nc(2), Nc(4), Nc(6)], &mut Nc::lt), 3)
+        assert_eq!(super::insertion_point(&Nc(7), &[Nc(2), Nc(4), Nc(6)], &Nc::lt), 3)
     }
 
     #[test]
@@ -425,9 +419,9 @@ mod tests {
         let s = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14];
         let mut profile = Vec::new();
         for v in 0 .. s.len() + 1 {
-            let mut count = 0;
-            assert_eq!(super::insertion_point(&v, &s, &mut |&a, &b|{count += 1; a < b}), v);
-            profile.push(count);
+            let count = Cell::new(0);
+            assert_eq!(super::insertion_point(&v, &s, &|&a, &b|{count.set(count.get() + 1); a < b}), v);
+            profile.push(count.get());
         }
         assert_eq!(profile, vec![4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4])
     }
@@ -437,9 +431,9 @@ mod tests {
         let s = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
         let mut profile = Vec::new();
         for v in 0 .. s.len() + 1 {
-            let mut count = 0;
-            assert_eq!(super::insertion_point(&v, &s, &mut |&a, &b|{count += 1; a < b}), v);
-            profile.push(count);
+            let count = Cell::new(0);
+            assert_eq!(super::insertion_point(&v, &s, &|&a, &b|{count.set(count.get() + 1); a < b}), v);
+            profile.push(count.get());
         }
         assert_eq!(profile, vec![1, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5])
     }
@@ -449,9 +443,9 @@ mod tests {
         let s = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16];
         let mut profile = Vec::new();
         for v in 0 .. s.len() + 1 {
-            let mut count = 0;
-            assert_eq!(super::insertion_point(&v, &s, &mut |&a, &b|{count += 1; a < b}), v);
-            profile.push(count);
+            let count = Cell::new(0);
+            assert_eq!(super::insertion_point(&v, &s, &|&a, &b|{count.set(count.get() + 1); a < b}), v);
+            profile.push(count.get());
         }
         assert_eq!(profile, vec![2, 2, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5])
     }
@@ -461,9 +455,9 @@ mod tests {
         let s = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19];
         let mut profile = Vec::new();
         for v in 0 .. s.len() + 1 {
-            let mut count = 0;
-            assert_eq!(super::insertion_point(&v, &s, &mut |&a, &b|{count += 1; a < b}), v);
-            profile.push(count);
+            let count = Cell::new(0);
+            assert_eq!(super::insertion_point(&v, &s, &|&a, &b|{count.set(count.get() + 1); a < b}), v);
+            profile.push(count.get());
         }
         assert_eq!(profile, vec![2, 4, 4, 4, 4, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5])
     }
@@ -473,9 +467,9 @@ mod tests {
         let s = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20];
         let mut profile = Vec::new();
         for v in 0 .. s.len() + 1 {
-            let mut count = 0;
-            assert_eq!(super::insertion_point(&v, &s, &mut |&a, &b|{count += 1; a < b}), v);
-            profile.push(count);
+            let count = Cell::new(0);
+            assert_eq!(super::insertion_point(&v, &s, &|&a, &b|{count.set(count.get() + 1); a < b}), v);
+            profile.push(count.get());
         }
         assert_eq!(profile, vec![3, 3, 4, 4, 4, 4, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5])
     }
