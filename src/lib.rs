@@ -206,7 +206,7 @@ fn merge<T, F, G>(mut s: &mut [T], split: usize, lt: &F, le: &G)
     }
 }
 
-fn sort_by<T, F>(s: &mut [T], compare: &F)
+pub fn sort_by<T, F>(s: &mut [T], compare: &F)
     where
         F: Fn(&T, &T) -> Ordering
 {
@@ -231,16 +231,10 @@ fn sort_by<T, F>(s: &mut [T], compare: &F)
     }
 }
 
-fn sort<T>(s: &mut [T])
+pub fn sort<T>(s: &mut [T])
     where T: Ord
 {
     sort_by(s, &T::cmp);
-}
-
-#[cfg(not(test))]
-fn main() {
-    let mut a = vec![2, 4, 6, 1, 3, 5];
-    merge(&mut a, 3, &i32::lt, &i32::le)
 }
 
 #[cfg(test)]
