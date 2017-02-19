@@ -1,5 +1,8 @@
 extern crate gcd;
 
+use std::cmp::min;
+use std::cmp::Ordering;
+
 use gcd::Gcd;
 
 
@@ -95,7 +98,6 @@ fn rotate<T>(s: &mut [T], k: usize) {
 
 fn merge<T, F, G>(mut s: &mut [T], split: usize, lt: &F, le: &G)
     where
-        T: Ord,
         F: Fn(&T, &T) -> bool,
         G: Fn(&T, &T) -> bool
 {
@@ -204,6 +206,37 @@ fn merge<T, F, G>(mut s: &mut [T], split: usize, lt: &F, le: &G)
     }
 }
 
+fn sort_by<T, F>(s: &mut [T], compare: &F)
+    where
+        F: Fn(&T, &T) -> Ordering
+{
+    let length = s.len();
+    let mut blk = 1;
+    while blk < length {
+        let mut start = 0;
+        let mut pivot = blk;
+        let mut end = 2 * blk;
+        while pivot < length {
+            merge(
+                &mut s[start .. min(end, length)],
+                blk,
+                &|a, b| {compare(a, b) == Ordering::Less},
+                &|a, b| {compare(a, b) != Ordering::Greater}
+            );
+            start = end;
+            pivot = start + blk;
+            end = pivot + blk;
+        }
+        blk *= 2;
+    }
+}
+
+fn sort<T>(s: &mut [T])
+    where T: Ord
+{
+    sort_by(s, &T::cmp);
+}
+
 #[cfg(not(test))]
 fn main() {
     let mut a = vec![2, 4, 6, 1, 3, 5];
@@ -217,6 +250,73 @@ mod tests {
     // A non-copy but comparable type is useful for testing, as bad moves are hidden by Copy types.
     #[derive(PartialEq,Eq,PartialOrd,Ord,Debug)]
     struct Nc(i32);
+
+    #[test]
+    fn sort_0() {
+        let mut s: [i32; 0] = [];
+        super::sort(&mut s);
+    }
+
+    #[test]
+    fn sort_1() {
+        let mut s = [5];
+        super::sort(&mut s);
+        assert_eq!(s[0], 5);
+    }
+
+    #[test]
+    fn sort_2_ordered() {
+        let mut s = [1, 2];
+        super::sort(&mut s);
+        assert_eq!(s[0], 1);
+        assert_eq!(s[1], 2);
+    }
+
+    #[test]
+    fn sort_2_unordered() {
+        let mut s = [2, 1];
+        super::sort(&mut s);
+        assert_eq!(s[0], 1);
+        assert_eq!(s[1], 2);
+    }
+
+    #[test]
+    fn sort_ordered() {
+        let mut s = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
+        let count = Cell::new(0);
+        super::sort_by(&mut s, &|a: &usize, b: &usize|{count.set(count.get() + 1); a.cmp(b)});
+        for (i, elem) in s.iter().enumerate() {
+            assert_eq!(*elem, i);
+        }
+        assert_eq!(count.get(), s.len() - 1);
+    }
+
+    #[test]
+    fn sort_reverse() {
+        let mut s = [15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0];
+        super::sort(&mut s);
+        for (i, elem) in s.iter().enumerate() {
+            assert_eq!(*elem, i);
+        }
+    }
+
+    #[test]
+    fn sort_mod3() {
+        let mut s = [0, 3, 6, 9, 12, 15, 1, 4, 7, 10, 13, 2, 5, 8, 11, 14];
+        super::sort(&mut s);
+        for (i, elem) in s.iter().enumerate() {
+            assert_eq!(*elem, i);
+        }
+    }
+
+    #[test]
+    fn sort_equal() {
+        let mut s = [5, 5, 5, 5, 5, 5, 5, 5, 5];
+        super::sort(&mut s);
+        for elem in s.iter() {
+            assert_eq!(*elem, 5);
+        }
+    }
 
     #[test]
     fn merge_0() {
