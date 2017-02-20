@@ -466,53 +466,53 @@ mod tests {
     }
 
     #[test]
-    fn bisect0() {
+    fn bisect_0() {
         assert_eq!(super::insertion_point(&Nc(3), &[], &Nc::lt), 0)
     }
 
     #[test]
-    fn bisect1_before() {
+    fn bisect_1_before() {
         assert_eq!(super::insertion_point(&Nc(1), &[Nc(2)], &Nc::lt), 0)
     }
     #[test]
-    fn bisect1_after() {
+    fn bisect_1_after() {
         assert_eq!(super::insertion_point(&Nc(3), &[Nc(2)], &Nc::lt), 1)
     }
 
     #[test]
-    fn bisect2_before() {
+    fn bisect_2_before() {
         assert_eq!(super::insertion_point(&Nc(1), &[Nc(2), Nc(4)], &Nc::lt), 0)
     }
     #[test]
-    fn bisect2_middle() {
+    fn bisect_2_middle() {
         assert_eq!(super::insertion_point(&Nc(3), &[Nc(2), Nc(4)], &Nc::lt), 1)
     }
     #[test]
-    fn bisect2_after() {
+    fn bisect_2_after() {
         assert_eq!(super::insertion_point(&Nc(5), &[Nc(2), Nc(4)], &Nc::lt), 2)
     }
 
     #[test]
-    fn bisect3_before() {
+    fn bisect_3_before() {
         assert_eq!(super::insertion_point(&Nc(1), &[Nc(2), Nc(4), Nc(6)], &Nc::lt), 0)
     }
     #[test]
-    fn bisect3_lt() {
+    fn bisect_3_lt() {
         // Use less-than if the value should be inserted before equal values
         assert_eq!(super::insertion_point(&Nc(4), &[Nc(2), Nc(4), Nc(6)], &Nc::lt), 1)
     }
     #[test]
-    fn bisect3_le() {
+    fn bisect_3_le() {
         // Use less-than-or-equal if value should be inserted after equal values
         assert_eq!(super::insertion_point(&Nc(4), &[Nc(2), Nc(4), Nc(6)], &Nc::le), 2)
     }
     #[test]
-    fn bisect3_after() {
+    fn bisect_3_after() {
         assert_eq!(super::insertion_point(&Nc(7), &[Nc(2), Nc(4), Nc(6)], &Nc::lt), 3)
     }
 
     #[test]
-    fn bisect3_2powm1() {
+    fn bisect_2powm1() {
         let s = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14];
         let mut profile = Vec::new();
         for v in 0 .. s.len() + 1 {
@@ -524,7 +524,7 @@ mod tests {
     }
 
     #[test]
-    fn bisect3_2pow() {
+    fn bisect_2pow() {
         let s = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
         let mut profile = Vec::new();
         for v in 0 .. s.len() + 1 {
@@ -536,7 +536,7 @@ mod tests {
     }
 
     #[test]
-    fn bisect3_2powp1() {
+    fn bisect_2powp1() {
         let s = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16];
         let mut profile = Vec::new();
         for v in 0 .. s.len() + 1 {
@@ -548,7 +548,7 @@ mod tests {
     }
 
     #[test]
-    fn bisect3_20() {
+    fn bisect_20() {
         let s = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19];
         let mut profile = Vec::new();
         for v in 0 .. s.len() + 1 {
@@ -560,7 +560,7 @@ mod tests {
     }
 
     #[test]
-    fn bisect3_21() {
+    fn bisect_21() {
         let s = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20];
         let mut profile = Vec::new();
         for v in 0 .. s.len() + 1 {
