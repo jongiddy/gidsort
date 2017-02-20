@@ -73,6 +73,19 @@ fn swap_sequence<T>(s: &mut [T], a: usize, b: usize, k: usize) {
     }
 }
 
+#[inline]
+fn addmod(a: usize, b: usize, n: usize) -> usize {
+    // Faster than using the % operator, addition of two mod values can
+    // never be more than 2n - 2, so a single subtraction gets back into range
+    let c = a + b;
+    if c >= n {
+        c - n
+    }
+    else {
+        c
+    }
+}
+
 fn rotate<T>(s: &mut [T], k: usize) {
     // Rotate the last k elements to the front of the slice.
     // given a slice of 0..n, move n-k..n to front and 0..n-k to end
@@ -91,10 +104,10 @@ fn rotate<T>(s: &mut [T], k: usize) {
     assert!(n > k);
     let c = k.gcd(n - k);
     for i in 0 .. c {
-        let mut j = (i + k) % n;
+        let mut j = addmod(i, k, n);
         while j != i {
             s.swap(i, j);
-            j = (j + k) % n;
+            j = addmod(j, k, n);
         }
     }
 }
