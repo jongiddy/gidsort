@@ -9,3 +9,8 @@ authors = ["Jonathan Giddy <jongiddy@gmail.com>"]
 
 gcd = "1.1.0"
 quickcheck = "0.4.1"
+
+
+[dev-dependencies]
+
+rand = "0.3.15"
