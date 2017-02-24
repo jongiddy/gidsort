@@ -32,7 +32,7 @@ fn split_biased(n: usize) -> usize {
     // For example, a sequence of 21 elements has length 00010101.  Masking off the high 1 bit
     // gives 00000101 = 5. If we test the value at position 5, the next test will either be 6-20
     // (15 values, a balanced binary tree requiring 4 more tests) or 0-4 (5 values). Removing the
-    // leftmost bit of 6 (00000101) gives 1.  Testing 1 wi1l make the next test 2-4 (3 values, a
+    // leftmost bit of 5 (00000101) gives 1.  Testing 1 wi1l make the next test 2-4 (3 values, a
     // balanced binary tree requiring 2 more tests) or 0, requiring 1 additional test.  Hence, the
     // rightmost values require 5 tests, the leftmost value requires 3 tests, and other low values
     // require 4 tests.
@@ -154,15 +154,19 @@ fn merge<T, F, G>(mut s: &mut [T], split: usize, lt: &F, le: &G)
         // called as part of a mergesort, which typically merges blocks of size 2^n.
         // Since that is one more 2^n - 1, the size of a balanced binary tree, `split_biased` must
         // use a tree of size 2^(n+1) - 1, and since it is biased to the left, only one comparison
-        // is required to check the value against the first point of the sequence.  This means
-        // already sorted sequences are merged with one comparison, and an entire mergesort of
-        // already sorted data will take the minimum possible (n-1) comparisons.  This is useful
-        // because much real data is close to already sorted, so optimising this case is valuable.
-        // Many other real-world sorts special-case for already sorted data.  In our case, the
+        // is required to check the value against the first point of the sequence.
+        //
+        // See the test `bisect_2pow` for an example.  In the test, /some/ of the paths must
+        // require 5 comparisons.  We bias the algorithm so that one common path is significantly
+        // advantaged at the cost of /all/ other paths requiring 5 comparisons.
+        //
+        // This means already ordered sequences are merged with one comparison, and an entire
+        // mergesort of already ordered data will take the minimum possible (n-1) comparisons.
+        // This is useful because much real data is close to already sorted, so optimising this
+        // case is valuable.  Many other real-world sorts special-case for already sorted data,
+        // often at the cost of worst-case performance for randomly ordered data.  In our case, the
         // single comparison is performed without affecting the worst-case performance on random
-        // data.  See the test `bisect3_2pow` for an example.  In the test, /some/ of the paths
-        // must require 5 comparisons.  We bias the algorithm so that one common path is
-        // significantly advantaged at the cost of /all/ other paths requiring 5 comparisons.
+        // data.
         return;
     }
     r1 = r0 + pos;
