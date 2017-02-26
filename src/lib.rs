@@ -159,12 +159,13 @@ fn merge<T, F>(mut s: &mut [T], split: usize, compare: &F, leftright: Ordering, 
     if llen == 0 || rlen == 0 {
         return;
     }
-    if llen == 1 {
-        // |L| = 1: Just insert it into R
-        let pos = insertion_point(&s[l0], &s[r0 .. r1], compare, leftright);
-        rotate(&mut s[l0 .. r0 + pos], pos);
-        return;
-    }
+    // When llen == 1 the code below performs the same number of comparisons and moves
+    // if llen == 1 {
+    //     // |L| = 1: Just insert it into R
+    //     let pos = insertion_point(&s[l0], &s[r0 .. r1], compare, leftright);
+    //     rotate(&mut s[l0 .. r0 + pos], pos);
+    //     return;
+    // }
     if rlen == 1 {
         // |R| = 1: Just insert it into L
         let pos = insertion_point(&s[r0], &s[l0 .. l1], compare, rightleft);
@@ -389,7 +390,8 @@ mod tests {
         let mut s: [i32; 0] = [];
         let count = Cell::new(0);
         super::merge(
-            &mut s, 0, &|&a, &b|{count.set(count.get() + 1); a.cmp(&b)}, Ordering::Less, Ordering::Greater);
+            &mut s, 0, &|&a, &b|{count.set(count.get() + 1); a.cmp(&b)}, Ordering::Less, Ordering::Greater
+        );
         assert_eq!(count.get(), 0);
     }
 
@@ -398,7 +400,8 @@ mod tests {
         let mut s = [1];
         let count = Cell::new(0);
         super::merge(
-            &mut s, 0, &|&a, &b|{count.set(count.get() + 1); a.cmp(&b)}, Ordering::Less, Ordering::Greater);
+            &mut s, 0, &|&a, &b|{count.set(count.get() + 1); a.cmp(&b)}, Ordering::Less, Ordering::Greater
+        );
         assert_eq!(count.get(), 0);
         assert_eq!(s[0], 1);
     }
@@ -408,7 +411,8 @@ mod tests {
         let mut s = [1];
         let count = Cell::new(0);
         super::merge(
-            &mut s, 1, &|&a, &b|{count.set(count.get() + 1); a.cmp(&b)}, Ordering::Less, Ordering::Greater);
+            &mut s, 1, &|&a, &b|{count.set(count.get() + 1); a.cmp(&b)}, Ordering::Less, Ordering::Greater
+        );
         assert_eq!(count.get(), 0);
         assert_eq!(s[0], 1);
     }
@@ -418,7 +422,8 @@ mod tests {
         let mut s = [1, 2];
         let count = Cell::new(0);
         super::merge(
-            &mut s, 1, &|&a, &b|{count.set(count.get() + 1); a.cmp(&b)}, Ordering::Less, Ordering::Greater);
+            &mut s, 1, &|&a, &b|{count.set(count.get() + 1); a.cmp(&b)}, Ordering::Less, Ordering::Greater
+        );
         assert_eq!(count.get(), 1);
         assert_eq!(s[0], 1);
         assert_eq!(s[1], 2);
@@ -429,7 +434,8 @@ mod tests {
         let mut s = [2, 1];
         let count = Cell::new(0);
         super::merge(
-            &mut s, 1, &|&a, &b|{count.set(count.get() + 1); a.cmp(&b)}, Ordering::Less, Ordering::Greater);
+            &mut s, 1, &|&a, &b|{count.set(count.get() + 1); a.cmp(&b)}, Ordering::Less, Ordering::Greater
+        );
         assert_eq!(count.get(), 1);
         assert_eq!(s[0], 1);
         assert_eq!(s[1], 2);
@@ -440,7 +446,8 @@ mod tests {
         let mut s = [7, 0, 1, 2, 3, 4, 5, 6, 8, 9, 10];
         let count = Cell::new(0);
         super::merge(
-            &mut s, 1, &|&a, &b|{count.set(count.get() + 1); a.cmp(&b)}, Ordering::Less, Ordering::Greater);
+            &mut s, 1, &|&a, &b|{count.set(count.get() + 1); a.cmp(&b)}, Ordering::Less, Ordering::Greater
+        );
         assert_eq!(count.get(), 4);
         for (i, elem) in s.iter().enumerate() {
             assert_eq!(*elem, i);
@@ -453,7 +460,8 @@ mod tests {
         let count = Cell::new(0);
         let leftlen = s.len() - 1;
         super::merge(
-            &mut s, leftlen, &|&a, &b|{count.set(count.get() + 1); a.cmp(&b)}, Ordering::Less, Ordering::Greater);
+            &mut s, leftlen, &|&a, &b|{count.set(count.get() + 1); a.cmp(&b)}, Ordering::Less, Ordering::Greater
+        );
         assert_eq!(count.get(), 4);
         for (i, elem) in s.iter().enumerate() {
             assert_eq!(*elem, i);
@@ -466,7 +474,8 @@ mod tests {
         let count = Cell::new(0);
         let leftlen = s.len() / 2;
         super::merge(
-            &mut s, leftlen, &|&a, &b|{count.set(count.get() + 1); a.cmp(&b)}, Ordering::Less, Ordering::Greater);
+            &mut s, leftlen, &|&a, &b|{count.set(count.get() + 1); a.cmp(&b)}, Ordering::Less, Ordering::Greater
+        );
         assert_eq!(count.get(), 1);
         for (i, elem) in s.iter().enumerate() {
             assert_eq!(*elem, i);
