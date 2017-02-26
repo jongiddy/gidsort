@@ -142,7 +142,7 @@ fn rotate<T>(s: &mut [T], k: usize) {
     }
 }
 
-fn merge<T, F>(mut s: &mut [T], split: usize, compare: &F, leftright: Ordering, rightleft: Ordering)
+fn merge<T, F>(s: &mut [T], split: usize, compare: &F, leftright: Ordering, rightleft: Ordering)
     where
         F: Fn(&T, &T) -> Ordering
 {
