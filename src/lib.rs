@@ -9,6 +9,7 @@ use gcd::Gcd;
 #[macro_use]
 extern crate quickcheck;
 
+#[inline]
 fn split_biased(n: usize) -> usize {
     // Return a split point that ensures that the RHS is a balanced binary tree.  A balanced binary
     // tree contains 2^k - 1 nodes. Hence the length can be represented in binary by all-ones on
