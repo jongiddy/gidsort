@@ -73,18 +73,28 @@ fn swap_sequence<T>(s: &mut [T], a: usize, b: usize, k: usize) {
     }
 }
 
-#[inline]
-fn addmod(a: usize, b: usize, n: usize) -> usize {
-    // Faster than using the % operator, addition of two mod values can
-    // never be more than 2n - 2, so a single subtraction gets back into range
-    let c = a + b;
-    if c >= n {
-        c - n
+fn add_modulo<T>(a: T, b: T, n: T) -> T
+    where
+        T: std::ops::Add<Output=T> + std::ops::Sub<Output=T> + Copy + PartialOrd
+{
+    // Return (a + b) % n
+    // Faster than using the % operator, does not overflow
+    debug_assert!(a >= n - n && a < n);
+    debug_assert!(b >= n - n && b < n);
+    let c = n - a;
+    if b >= c {
+        // b >= n - a  ->  b + a >= n.
+        // a < n, b < n  ->  a + b < 2n
+        // Hence: n <= a + b <= 2n - 1  ->  0 < a + b - n < n - 1
+        // a + b - n  =  b - n + a  =  b - (n - a)  =  b - c
+        b - c
     }
     else {
-        c
+        // if b < n - a, then b + a < n, and in the modulo range
+        a + b
     }
 }
+
 
 fn rotate<T>(s: &mut [T], k: usize) {
     // Rotate the last k elements to the front of the slice.
@@ -104,10 +114,10 @@ fn rotate<T>(s: &mut [T], k: usize) {
     assert!(n > k);
     let c = k.gcd(n - k);
     for i in 0 .. c {
-        let mut j = addmod(i, k, n);
+        let mut j = add_modulo(i, k, n);
         while j != i {
             s.swap(i, j);
-            j = addmod(j, k, n);
+            j = add_modulo(j, k, n);
         }
     }
 }
@@ -264,6 +274,27 @@ mod tests {
     // A non-copy but comparable type is useful for testing, as bad moves are hidden by Copy types.
     #[derive(PartialEq,Eq,PartialOrd,Ord,Debug)]
     struct Nc(i32);
+
+    #[test]
+    fn add_modulo_lt_n() {
+        assert_eq!(super::add_modulo(5, 6, 15), 11);
+    }
+
+    #[test]
+    fn add_modulo_eq_n() {
+        assert_eq!(super::add_modulo(9, 6, 15), 0);
+    }
+
+    #[test]
+    fn add_modulo_gt_n() {
+        assert_eq!(super::add_modulo(12, 6, 15), 3);
+    }
+
+    #[test]
+    fn addmod_no_overflow() {
+        let max = i32::max_value();
+        assert_eq!(super::add_modulo(max - 1, max - 1, max), max - 2);
+    }
 
     #[test]
     fn sort_0() {
