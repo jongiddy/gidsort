@@ -131,7 +131,7 @@ fn rotate<T>(s: &mut [T], k: usize) {
     if k == 0 || k == n {
         return
     }
-    assert!(n > k);
+    debug_assert!(n > k);
     let c = k.gcd(n - k);
     for i in 0 .. c {
         let mut j = add_modulo(i, k, n);
