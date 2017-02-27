@@ -38,7 +38,7 @@ fn split_biased(n: usize) -> usize {
     // rightmost values require 5 tests, the leftmost value requires 3 tests, and other low values
     // require 4 tests.
 
-    let mask = (1 as usize).rotate_right(n.leading_zeros() + 1);
+    let mask = ((n >> 1) + 1).next_power_of_two();
     n & !mask
 }
 
