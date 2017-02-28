@@ -90,159 +90,98 @@ Now, split L into L<sub>X</sub>, L<sub>Y</sub>, and L', where |L<sub>X</sub>| = 
 |---|---|---|---|
 | S | L<sub>X</sub> - L<sub>Y</sub> - L' | Y - M' | X - R' |
 
-We want to end up with X and Y appended to S, and our invariants kept: L, M, and R still ordered and M < L.  There are 4 reconfigurations that give this:
+We want to end up with X and Y appended to S, and our invariants kept: each of L, M, and R ordered internally and M < L.  There are 4 reconfigurations that give this:
 
-1. 
+1.
    | S | L | M | R |
    |---|---|---|---|
    | S - X - Y | M' - L<sub>X</sub> - L<sub>Y</sub> - L' | | R' |
 
-1. 
+1.
    | S | L | M | R |
    |---|---|---|---|
    | S - X - Y | L<sub>X</sub> - L<sub>Y</sub> - L' | M' | R' |
 
-1. 
+1.
    | S | L | M | R |
    |---|---|---|---|
    | S - X - Y | L<sub>Y</sub> - L' | M' - L<sub>X</sub> | R' |
 
-1. 
+1.
    | S | L | M | R |
    |---|---|---|---|
    | S - X - Y | L' | M' - L<sub>X</sub> - L<sub>Y</sub> | R' |
 
+   Note, this is the only reconfiguration where L' stays in the same location.
+
 (Note, the 5th reconfiguration where all L elements move to M degenerates back to the first case, since if |L| == 0, we always rename M as L).
 
-There are multiple ways to achieve this reconfiguration. We limit ourselves to two operations:
-1. swap of two equal-sized but possibly disjoint sequences, and 
-2. rotation within a block, i.e. swapping two possibly unequal-sized bu adjacent blocks.
+There are multiple ways to achieve these reconfigurations.
+We initially limit ourselves to two operations:
 
-(Note, the rest of this document is still in draft format)
+1. swap of two equal-sized but possibly disjoint sequences, and
+2. rotation, i.e. swapping two possibly unequal-sized but adjacent blocks.
 
-```
-A. S0 - S1 / M - L0 - L1 - L
+Method A:
 
-- only solution that eliminates M
-- more expensive than C
-- use if |L| <= x + 2y and |L| + |M| + x - y < |L| (never, since y <= |M|)
+| Sequence | Step | Total moves | Final moves | Net moves |
+|---|---|---|---|---|
+| L<sub>X</sub> - L<sub>Y</sub> - L' - Y - M' - X - R' | rotate Y - M' - X to M' - X - Y | \|M\| + \|X\| | 0 | \|M\| + \|X\| |
+| L<sub>X</sub> - L<sub>Y</sub> - L' - M' - X - Y - R' | swap L<sub>X</sub> - L<sub>Y</sub> with X - Y | 2\|X\| + 2\|Y\| | \|X\| + \|Y\| | \|X\| + \|Y\| |
+| X - Y - L' - M' - L<sub>X</sub> - L<sub>Y</sub> - R' | = reconfiguration 4 | | total = | \|M\| + 2\|X\| + \|Y\| |
 
-1.
-- swap L0 - S0
-        d = 2x, f = x, c = x
-- rot L1 - L - S1 - M - L0 -> S1 - M - L0 - L1 - L
-        d = |L| + |M|, f = y, c = |L| + |M| - y
-- total cost: |L| + |M| + x - y
+- works for |L| >= |X| + |Y|
 
-B. S0 - S1 / L0 - L1 - L / M
+Method B:
 
-- more expensive than A and C
+| Sequence | Step | Total moves | Final moves | Net moves |
+|---|---|---|---|---|
+| L<sub>X</sub> - L<sub>Y</sub> - L' - Y - M' - X - R' | swap L<sub>X</sub> with X | 2\|X\| | \|X\| | \|X\| |
+| X - L<sub>Y</sub> - L' - Y - M' - L<sub>X</sub> - R' | rotate L<sub>Y</sub> - L' - Y to Y - L<sub>Y</sub> - L' | \|Y\| + (\|L\| - \|X\| - \|Y\|) + \|Y\| | \|Y\| | \|L\| - \|X\| |
+| X - Y - L<sub>Y</sub> - L' - M' - L<sub>X</sub> - R' | = reconfiguration 3 | | total = | \|L\| |
 
-1.
-- rot S1 - M - S0 -> S0 - S1 - M
-        d = |M| + x, f = 0, c = |M| + x
-- rot L0 - L1 - L - S0 - S1 -> S0 - S1 - L0 - L1 - L
-        d = |L| + x + y, f = x + y, c = |L|
-- total cost: |L| + |M| + x
+- fewer moves than Method A if:
+	|L| < |M| + 2|X| + |Y|
+- works for |L| >= |X|
 
-C. S0 - S1 / L1 - L / M - L0
+Method C:
 
-- cheaper than 1 and 2
-- works if |L| >= x (if |L| == x, then M becomes L)
-- use if |L| < |M| + 2x + y
-- if |L| < x:
-        - swap L - S0a
-                d = 2|L|, f = |L|, c = |L|
-        - rotate S1 - M - L - S0b to S0b - S1 - M - L
-                d = |M| + x, f = x - |L|, c = |M| + |L|
-        - total cost: 2|L| + |M|
-        - S0 S1 M L R
-        - eliminates M
-        OR
-        - rotate L - S1 - M - S0 to S0 - L - S1 - M
-                d = |L| + |M| + x, f = x, c = |L| + |M|
-        - rotate L - S1 to S1 - L
-                d = |L| + y, f = y, c = |L|
-        - total cost: 2|L| + |M|
-        - S0 S1 L M R
-        OR
-        - rotate L - S1 - M - S0 to S0 - L - S1 - M
-                d = |L| + |M| + x, f = x, c = |L| + |M|
-        - rotate L - S1 - M to S1 - M - L
-                d = |L| + |M|, f = y, c = |L| + |M| - y
-        - total cost 2|L| + 2|M| - y > 2|L| + |M|
-        OR
-        - rotate S1 - M - S0 to S0 - S1 - M
-                d = |M| + x, f = 0, c = |M| + x
-        - rotate L - S0 - S1 to S0 - S1 - L
-                d = |L| + x + y, f = x + y, c = |L|
-        - total cost: |L| + |M| + x > 2|L| + |M|
+If |L| < |X|, split X into X' and X'' such that |X'| = |L|:
 
-1.
-- swap L0 - S0
-        d = 2x, f = x, c = x
-- rot L1 - L - S1 -> S1 - L1 - L
-        d = |L| - x + y, f = y, c = |L| - x
-- total cost: |L|
+| Sequence | Step | Total moves | Final moves | Net moves |
+|---|---|---|---|---|
+| L - Y - M' - X' - X'' - R' | swap L with X' | 2\|L\| | \|L\| | \|L\| |
+| X' - Y - M' - L - X'' - R' | rotate Y - M' - L - X'' to X'' - Y - M' - L | \|M\| + \|L\| + (\|X\|- \|L\|) | (\|X\| - \|L\|) + \|Y\| | \|L\| + \|M\| - \|Y\| |
+| X' - X'' - Y - M' - L - R' | = reconfiguration 1 | | total = | 2\|L\| + \|M\| - \|Y\| |
 
-D. S0 - S1 / L / M - L0 - L1
+- eliminates M, since M' - L can be remerged as L
+- fewer moves than Method A if:
+	- 2|L| + |M| - |Y| < |M| + 2|X| + |Y|
+	- 2|L| - |Y| < 2|X| + |Y|
+	- 2|L| < 2|X| + 2|Y|
+	- |L| < |X| + |Y|
+- fewer moves than Method B if:
+	- 2|L| + |M| - |Y| < |L|
+	- |L| + |M| - |Y| < 0
+	- |L| + |M| < |Y|
+	- Since |Y| <= |M|, never, so this is only useful when other methods do not work (i.e |L| < |X|)
 
-- only solution where L does not move
-- option 2 possibly more efficient due to single swap
-
-1.
-- swap L0 - S0
-        d = 2x, f = x, c = x
-- swap L1 - S1
-        d = 2y, f = y, c = y
-- rot L1 - M - L0 to M - L0 - L1
-        d = |M| + x, f = 0, c = |M| + x
-- total cost: |M| + 2x + y
-
-2.
-- rot S1 - M - S0 to M - S0 - S1
-        d = |M| + x, f = 0, c = |M| + x
-- swap L0/L1 - S0/S1
-        d = 2x + 2y, f = x + y, c = x + y
-- total cost: |M| + 2x + y
-
-3.
-- swap L0 - S0
-        d = 2x, f = x, c = x
-- rot S1 - M - L0 to M - L0 - S1
-        d = |M| + x, f = 0, c = |M| + x
-- swap L1 - S1
-        d = 2y, f = y, c = y
-- total cost = |M| + 2x + y
-
-4.
-- swap L1 - S1
-        d = 2x, f = x, c = x
-- rot L1 - M - S0 to M - S0 - L1
-        d = |M| + x, f = 0, c = |M| + x
-- swap L0 - S0
-        d = 2y, f = y, c = y
-- total cost = |M| + 2x + y
 
 Final algorithm:
 
-if |L| < x:
-        - swap L - S0a
-        - rot S1 - M - L - S0b to S0b - S1 - M - L
-        - M L
-else if |L| < |M| + 2x + y:
-        - swap L0 - S0
-        - rot L1 - L - S1 -> S1 - L1 - L
-        - L1 L / M L0
-else:
-        - rot S1 - M - S0 to M - S0 - S1
-        - swap L0/L1 - S0/S1
-        - L / M L0 L1
-
-Note, since first test and clause do not split S1 - M, we can check for this
-after finding x, and then search all of M-L for new split point, rather than
-just M
 ```
+if |L| < |X|:
+	Method C
+else if |L| < |M| + 2|X| + |Y|:
+	Method B
+else:
+	Method A
+```
+
+Note, since first test and method C do not split Y - M', we can perform Method C
+after finding |X|, and then search all of M-L for new split point, rather than
+just M.  (This may not be a good idea after the next step).
+
 
 
 
