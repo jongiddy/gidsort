@@ -12,7 +12,7 @@ Most attempts to create an in-place mergesort either lose the property of stabil
 
 A common pattern for in-place mergesorts is to break the structure into √n sized blocks and move the highest values to one end to create a workspace with which to perform a standard merge on each block.
 
-The algorithm here avoids that approach, and starts with the observation that for a merge of two sorted sequences L = {L<sub>0</sub>...l<sub>|L|</sub>} and R = {R<sub>0</sub>...r<sub>|R|</sub>}:
+The algorithm here avoids that approach, and starts with the observation that for a merge of two ordered sequences L = {L<sub>0</sub>...l<sub>|L|</sub>} and R = {R<sub>0</sub>...r<sub>|R|</sub>}:
 
 | S |      L      |   R   |
 |---|-------------|-------|
@@ -30,7 +30,7 @@ When the lowest value is R<sub>0</sub>, we must move R<sub>0</sub> to the locati
 |---|-------------|-------|
 | 1 2 3 | 4 8 9 | 7 5 6 |
 
-However, this breaks the invariant that R is sorted. So we introduce a new block M to hold the smallest values of L:
+However, this breaks the invariant that R is ordered. So we introduce a new block M to hold the smallest values of L. This block has the invariants that it is always ordered and all values in M are before all values in L:
 
 | S |      L      |   M | R   |
 |---|-------------|---|-----|
@@ -74,17 +74,178 @@ We can keep going, swapping L<sub>0</sub> and M<sub>0</sub> for a little while, 
 |---|---|---|---|
 | 1 2 3 | 8 10 | 4 6 | 5 7 9 |
 
-But eventually we break the invariant that M must be sorted:
+But eventually we break the invariant that M must be ordered:
 
 | S | L | M | R |
 |---|---|---|---|
 | 1 2 3 4 | 10 | 8 6 | 5 7 9 |
 
-So, we don't want to do the previous step.
+Consider an algorithm to merge M and R into the space to the left of L.
+
+First, split R into X and RZ where X contains all values less than M<sub>0</sub>.
+Then, split M into Y and MZ where Y contains all values less than RZ<sub>0</sub>.
+Now, split L into L<sub>X</sub>, L<sub>Y</sub>, and LZ, where |L<sub>X</sub>| = |X| and |L<sub>Y</sub>| = |Y|.
 
 | S | L | M | R |
 |---|---|---|---|
-| 1 2 3 | 8 10 | 4 6 | 5 7 9 |
+| S | L<sub>X</sub> - L<sub>Y</sub> - LZ | Y - M | X - R |
+
+We want to end up with X and Y appended to S, and our invariants kept: L, M, and R still ordered and M < L.  There are 4 reconfigurations that give this:
+
+1. 
+   | S | L | M | R |
+   |---|---|---|---|
+   | S - X - Y | M - L<sub>X</sub> - L<sub>Y</sub> - LZ | | R |
+
+1. 
+   | S | L | M | R |
+   |---|---|---|---|
+   | S - X - Y | L<sub>X</sub> - L<sub>Y</sub> - LZ | M | R |
+
+1. 
+   | S | L | M | R |
+   |---|---|---|---|
+   | S - X - Y | L<sub>Y</sub> - LZ | M - L<sub>X</sub> | R |
+
+1. 
+   | S | L | M | R |
+   |---|---|---|---|
+   | S - X - Y | LZ | M - L<sub>X</sub> - L<sub>Y</sub> | R |
+
+(Note, the 5th reconfiguration where all L elements move to M degenerates back to the first case, since if |L| == 0, we always rename M as L).
+
+(Note, the rest of this document is still in draft format)
+
+```
+A. S0 - S1 / M - L0 - L1 - L
+
+- only solution that eliminates M
+- more expensive than C
+- use if |L| <= x + 2y and |L| + |M| + x - y < |L| (never, since y <= |M|)
+
+1.
+- swap L0 - S0
+        d = 2x, f = x, c = x
+- rot L1 - L - S1 - M - L0 -> S1 - M - L0 - L1 - L
+        d = |L| + |M|, f = y, c = |L| + |M| - y
+- total cost: |L| + |M| + x - y
+
+B. S0 - S1 / L0 - L1 - L / M
+
+- more expensive than A and C
+
+1.
+- rot S1 - M - S0 -> S0 - S1 - M
+        d = |M| + x, f = 0, c = |M| + x
+- rot L0 - L1 - L - S0 - S1 -> S0 - S1 - L0 - L1 - L
+        d = |L| + x + y, f = x + y, c = |L|
+- total cost: |L| + |M| + x
+
+C. S0 - S1 / L1 - L / M - L0
+
+- cheaper than 1 and 2
+- works if |L| >= x (if |L| == x, then M becomes L)
+- use if |L| < |M| + 2x + y
+- if |L| < x:
+        - swap L - S0a
+                d = 2|L|, f = |L|, c = |L|
+        - rotate S1 - M - L - S0b to S0b - S1 - M - L
+                d = |M| + x, f = x - |L|, c = |M| + |L|
+        - total cost: 2|L| + |M|
+        - S0 S1 M L R
+        - eliminates M
+        OR
+        - rotate L - S1 - M - S0 to S0 - L - S1 - M
+                d = |L| + |M| + x, f = x, c = |L| + |M|
+        - rotate L - S1 to S1 - L
+                d = |L| + y, f = y, c = |L|
+        - total cost: 2|L| + |M|
+        - S0 S1 L M R
+        OR
+        - rotate L - S1 - M - S0 to S0 - L - S1 - M
+                d = |L| + |M| + x, f = x, c = |L| + |M|
+        - rotate L - S1 - M to S1 - M - L
+                d = |L| + |M|, f = y, c = |L| + |M| - y
+        - total cost 2|L| + 2|M| - y > 2|L| + |M|
+        OR
+        - rotate S1 - M - S0 to S0 - S1 - M
+                d = |M| + x, f = 0, c = |M| + x
+        - rotate L - S0 - S1 to S0 - S1 - L
+                d = |L| + x + y, f = x + y, c = |L|
+        - total cost: |L| + |M| + x > 2|L| + |M|
+
+1.
+- swap L0 - S0
+        d = 2x, f = x, c = x
+- rot L1 - L - S1 -> S1 - L1 - L
+        d = |L| - x + y, f = y, c = |L| - x
+- total cost: |L|
+
+D. S0 - S1 / L / M - L0 - L1
+
+- only solution where L does not move
+- option 2 possibly more efficient due to single swap
+
+1.
+- swap L0 - S0
+        d = 2x, f = x, c = x
+- swap L1 - S1
+        d = 2y, f = y, c = y
+- rot L1 - M - L0 to M - L0 - L1
+        d = |M| + x, f = 0, c = |M| + x
+- total cost: |M| + 2x + y
+
+2.
+- rot S1 - M - S0 to M - S0 - S1
+        d = |M| + x, f = 0, c = |M| + x
+- swap L0/L1 - S0/S1
+        d = 2x + 2y, f = x + y, c = x + y
+- total cost: |M| + 2x + y
+
+3.
+- swap L0 - S0
+        d = 2x, f = x, c = x
+- rot S1 - M - L0 to M - L0 - S1
+        d = |M| + x, f = 0, c = |M| + x
+- swap L1 - S1
+        d = 2y, f = y, c = y
+- total cost = |M| + 2x + y
+
+4.
+- swap L1 - S1
+        d = 2x, f = x, c = x
+- rot L1 - M - S0 to M - S0 - L1
+        d = |M| + x, f = 0, c = |M| + x
+- swap L0 - S0
+        d = 2y, f = y, c = y
+- total cost = |M| + 2x + y
+
+Final algorithm:
+
+if |L| < x:
+        - swap L - S0a
+        - rot S1 - M - L - S0b to S0b - S1 - M - L
+        - M L
+else if |L| < |M| + 2x + y:
+        - swap L0 - S0
+        - rot L1 - L - S1 -> S1 - L1 - L
+        - L1 L / M L0
+else:
+        - rot S1 - M - S0 to M - S0 - S1
+        - swap L0/L1 - S0/S1
+        - L / M L0 L1
+
+Note, since first test and clause do not split S1 - M, we can check for this
+after finding x, and then search all of M-L for new split point, rather than
+just M
+```
+
+
+
+Older notes:
+
+
+
 
 When we move M<sub>0</sub> out, a gap opens between L and M. We could:
 
