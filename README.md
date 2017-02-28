@@ -82,37 +82,41 @@ But eventually we break the invariant that M must be ordered:
 
 Consider an algorithm to merge M and R into the space to the left of L.
 
-First, split R into X and RZ where X contains all values less than M<sub>0</sub>.
-Then, split M into Y and MZ where Y contains all values less than RZ<sub>0</sub>.
-Now, split L into L<sub>X</sub>, L<sub>Y</sub>, and LZ, where |L<sub>X</sub>| = |X| and |L<sub>Y</sub>| = |Y|.
+First, split R into X and R' where X contains all values less than M<sub>0</sub>.
+Then, split M into Y and M' where Y contains all values less than R'<sub>0</sub>.
+Now, split L into L<sub>X</sub>, L<sub>Y</sub>, and L', where |L<sub>X</sub>| = |X| and |L<sub>Y</sub>| = |Y|.
 
 | S | L | M | R |
 |---|---|---|---|
-| S | L<sub>X</sub> - L<sub>Y</sub> - LZ | Y - M | X - R |
+| S | L<sub>X</sub> - L<sub>Y</sub> - L' | Y - M' | X - R' |
 
 We want to end up with X and Y appended to S, and our invariants kept: L, M, and R still ordered and M < L.  There are 4 reconfigurations that give this:
 
 1. 
    | S | L | M | R |
    |---|---|---|---|
-   | S - X - Y | M - L<sub>X</sub> - L<sub>Y</sub> - LZ | | R |
+   | S - X - Y | M' - L<sub>X</sub> - L<sub>Y</sub> - L' | | R' |
 
 1. 
    | S | L | M | R |
    |---|---|---|---|
-   | S - X - Y | L<sub>X</sub> - L<sub>Y</sub> - LZ | M | R |
+   | S - X - Y | L<sub>X</sub> - L<sub>Y</sub> - L' | M' | R' |
 
 1. 
    | S | L | M | R |
    |---|---|---|---|
-   | S - X - Y | L<sub>Y</sub> - LZ | M - L<sub>X</sub> | R |
+   | S - X - Y | L<sub>Y</sub> - L' | M' - L<sub>X</sub> | R' |
 
 1. 
    | S | L | M | R |
    |---|---|---|---|
-   | S - X - Y | LZ | M - L<sub>X</sub> - L<sub>Y</sub> | R |
+   | S - X - Y | L' | M' - L<sub>X</sub> - L<sub>Y</sub> | R' |
 
 (Note, the 5th reconfiguration where all L elements move to M degenerates back to the first case, since if |L| == 0, we always rename M as L).
+
+There are multiple ways to achieve this reconfiguration. We limit ourselves to two operations:
+1. swap of two equal-sized but possibly disjoint sequences, and 
+2. rotation within a block, i.e. swapping two possibly unequal-sized bu adjacent blocks.
 
 (Note, the rest of this document is still in draft format)
 
