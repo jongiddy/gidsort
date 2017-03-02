@@ -82,8 +82,8 @@ But eventually we break the invariant that M must be ordered:
 
 Consider an algorithm to merge M and R into the space to the left of L.
 
-First, split R into X and R' where X contains all values less than M<sub>0</sub>.
-Then, split M into Y and M' where Y contains all values less than R'<sub>0</sub>.
+First, split R into X and R' where X contains all values of R less than M<sub>0</sub>.
+Then, split M into Y and M' where Y contains all values of M less than R'<sub>0</sub>.
 Now, split L into L<sub>X</sub>, L<sub>Y</sub>, and L', where |L<sub>X</sub>| = |X| and |L<sub>Y</sub>| = |Y|.
 
 | S | L | M | R |
@@ -92,27 +92,33 @@ Now, split L into L<sub>X</sub>, L<sub>Y</sub>, and L', where |L<sub>X</sub>| = 
 
 We want to end up with X and Y appended to S, and our invariants kept: each of L, M, and R ordered internally and M < L.  There are 4 reconfigurations that give this:
 
-1.
-   | S | L | M | R |
-   |---|---|---|---|
-   | S - X - Y | M' - L<sub>X</sub> - L<sub>Y</sub> - L' | | R' |
+Configuration 1:
 
-1.
-   | S | L | M | R |
-   |---|---|---|---|
-   | S - X - Y | L<sub>X</sub> - L<sub>Y</sub> - L' | M' | R' |
+| S | L | M | R |
+|---|---|---|---|
+| S - X - Y | M' - L<sub>X</sub> - L<sub>Y</sub> - L' | | R' |
 
-1.
-   | S | L | M | R |
-   |---|---|---|---|
-   | S - X - Y | L<sub>Y</sub> - L' | M' - L<sub>X</sub> | R' |
+Note, this configuration eliminates M.
 
-1.
-   | S | L | M | R |
-   |---|---|---|---|
-   | S - X - Y | L' | M' - L<sub>X</sub> - L<sub>Y</sub> | R' |
+Configuration 2:
 
-   Note, this is the only reconfiguration where L' stays in the same location.
+| S | L | M | R |
+|---|---|---|---|
+| S - X - Y | L<sub>X</sub> - L<sub>Y</sub> - L' | M' | R' |
+
+Configuration 3:
+
+| S | L | M | R |
+|---|---|---|---|
+| S - X - Y | L<sub>Y</sub> - L' | M' - L<sub>X</sub> | R' |
+
+Configuration 4:
+
+| S | L | M | R |
+|---|---|---|---|
+| S - X - Y | L' | M' - L<sub>X</sub> - L<sub>Y</sub> | R' |
+
+Note, this is the only reconfiguration where L' stays in the same location.
 
 (Note, the 5th reconfiguration where all L elements move to M degenerates back to the first case, since if |L| == 0, we always rename M as L).
 
@@ -122,7 +128,7 @@ We initially limit ourselves to two operations:
 1. swap of two equal-sized but possibly disjoint sequences, and
 2. rotation, i.e. swapping two possibly unequal-sized but adjacent blocks.
 
-Method A:
+Method A1:
 
 | Sequence | Step | Total moves | Final moves | Net moves |
 |---|---|---|---|---|
@@ -132,7 +138,7 @@ Method A:
 
 - works for |L| >= |X| + |Y|
 
-Method B:
+Method A2:
 
 | Sequence | Step | Total moves | Final moves | Net moves |
 |---|---|---|---|---|
@@ -140,11 +146,11 @@ Method B:
 | X - L<sub>Y</sub> - L' - Y - M' - L<sub>X</sub> - R' | rotate L<sub>Y</sub> - L' - Y to Y - L<sub>Y</sub> - L' | \|Y\| + (\|L\| - \|X\| - \|Y\|) + \|Y\| | \|Y\| | \|L\| - \|X\| |
 | X - Y - L<sub>Y</sub> - L' - M' - L<sub>X</sub> - R' | = reconfiguration 3 | | total = | \|L\| |
 
-- fewer moves than Method A if:
+- fewer moves than Method A1 if:
 	|L| < |M| + 2|X| + |Y|
 - works for |L| >= |X|
 
-Method C:
+Method A3:
 
 If |L| < |X|, split X into X' and X'' such that |X'| = |L|:
 
@@ -155,104 +161,240 @@ If |L| < |X|, split X into X' and X'' such that |X'| = |L|:
 | X' - X'' - Y - M' - L - R' | = reconfiguration 1 | | total = | 2\|L\| + \|M\| - \|Y\| |
 
 - eliminates M, since M' - L can be remerged as L
-- fewer moves than Method A if:
+- fewer moves than Method A1 if:
 	- 2|L| + |M| - |Y| < |M| + 2|X| + |Y|
 	- 2|L| - |Y| < 2|X| + |Y|
 	- 2|L| < 2|X| + 2|Y|
 	- |L| < |X| + |Y|
-- fewer moves than Method B if:
+- fewer moves than Method A2 if:
 	- 2|L| + |M| - |Y| < |L|
 	- |L| + |M| - |Y| < 0
 	- |L| + |M| < |Y|
 	- Since |Y| <= |M|, never, so this is only useful when other methods do not work (i.e |L| < |X|)
 
 
-Final algorithm:
+Algorithm A:
 
 ```
 if |L| < |X|:
-	Method C
+	Method A3
 else if |L| < |M| + 2|X| + |Y|:
-	Method B
+	Method A2
 else:
-	Method A
+	Method A1
 ```
 
-Note, since first test and method C do not split Y - M', we can perform Method C
-after finding |X|, and then search all of M-L for new split point, rather than
-just M.  (This may not be a good idea after the next step).
+If the insertion point for R'<sub>0</sub> is found inside M (not at the end of M), i.e. |Y| < |M|, then after the reconfiguration, we know that R<sub>0</sub> is the minimum value remaining in the unsorted values.
+Keeping this information available for the next iteration requires either a flag or for this information to be a loop invariant.
+Setting the loop invariant up allows us to move initial values in L that are already in place straight to S, so a loop invariant sounds good.
+
+There are some special cases to consider.
+
+If |X| == |R| (M<sub>0</sub> > R<sub>i</sub> for all i), then we simply need to reconfigure L - M - R to R - M - L as a final step to fully merged sequences.
+
+Method B1
+
+| Sequence | Step | Total moves | Final moves | Net moves |
+|---|---|---|---|---|
+| L - M - R | rotate L - M to M - L | \|L\| + \|M\| | 0 | \|L\| + \|M\| |
+| M - L - R | rotate M - L - R to R - M - L | \|M\| + \|L\| + \|R\| | \|M\| + \|L\| + \|R\| | 0 |
+| R - L - M | | | total = | \|L\| + \|M\| |
+
+Method B2
+
+| Sequence | Step | Total moves | Final moves | Net moves |
+|---|---|---|---|---|
+| L - M - R | rotate M - R to R - M | \|M\| + \|R\| | 0 | \|M\| + \|R\| |
+| L - R - M | rotate L - R - M to R - M - L | \|L\| + \|R\| + \|M\| | \|L\| + \|R\| + \|M\| | 0 |
+| R - L - M | | | total = | \|M\| + \|R\| |
+
+- fewer moves than Method B1 if:
+	- \|M\| + \|R\| < \|L\| + \|M\|
+	- \|R\| < \|L\|
 
 
+Algorithm B:
+
+```
+find X where M<sub>0</sub> < R
+if |X| == |R|:
+	if |L| < |R|:
+		Method B1
+	else:
+		Method B2
+	merge completed
+else:
+	find Y where R'<sub>0</sub> < M
+	if |L| < |X|:
+		Method A3
+	else if |L| < |M| + 2|X| + |Y|:
+		Method A2
+	else:
+		Method A1
+```
 
 
-Older notes:
+If |Y| == |M| (R'<sub>0</sub> > M<sub>i</sub> for all i), then M will be eliminated and the loop invariant does not necessarily hold.
+We need to search for R'<sub>0</sub> in L as well to keep the invariant.
+Hence, we need to consider different approaches for dealing with this case.
 
+To represent this case, remove M' and add Z, where Z contains all values of L less than R'<sub>0</sub>.
 
+| S | L | M | R |
+|---|---|---|---|
+| S | Z - L<sub>X</sub> - L<sub>Y</sub> - L' | Y | X - R' |
 
+We want to end up with X, Y, and Z appended to S, and our invariants kept: each of L, M, and R ordered internally and M < L.  There are 3 reconfigurations that give this:
 
-When we move M<sub>0</sub> out, a gap opens between L and M. We could:
+Configuration 5:
 
-1. Shift L right, opening a gap to insert M<sub>0</sub>
+| S | L | M | R |
+|---|---|---|---|
+| S - X - Y - Z | L<sub>X</sub> - L<sub>Y</sub> - L' | | R' |
 
-	| S | L | M | R |
-	|---|---|---|---|
-	| 1 2 3 4 | 8 10 | 6 | 5 7 9 |
+Configuration 6:
 
-	This solution moves |L| values.
-	(Note, to measure the cost, count the total number of moves of a value from its original position but subtract the number of values moved into their final position.
-	Hence, in this case, we ignore the move of M<sub>0</sub> to its final location.)
+| S | L | M | R |
+|---|---|---|---|
+| S - X - Y - Z | L<sub>Y</sub> - L' | L<sub>X</sub> | R' |
 
-2. Shift M left one space, opening a gap at end of M to insert L<sub>0</sub>
+Configuration 7:
 
-	| S | L | M | R |
-	|---|---|---|---|
-	| 1 2 3 4 | 10 | 6 8 | 5 7 9 |
+| S | L | M | R |
+|---|---|---|---|
+| S - X - Y - Z | L' | L<sub>X</sub> - L<sub>Y</sub> | R' |
 
-	This solution moves |M| values (|M| values from M + 1 value from L, minus one value (M<sub>0</sub> placed into final position)s.
+Method C1
 
-3. Rotate M and L to recombine as a single L
+| Sequence | Step | Total moves | Final moves | Net moves |
+|---|---|---|---|---|
+| Z - L<sub>X</sub> - L<sub>Y</sub> - L' - Y - X - R' | rotate Y - X to X - Y | \|X\| + \|Y\| | 0 | \|X\| + \|Y\| |
+| Z - L<sub>X</sub> - L<sub>Y</sub> - L' - X - Y - R' | rotate Z - L<sub>X</sub> - L<sub>Y</sub> - L' - X - Y to X - Y - Z - L<sub>X</sub> - L<sub>Y</sub> - L'  | \|Z\| + \|X\| + \|Y\| + (\|L\| - \|X\| - \|Y\| - \|Z\|) + |X\| + \|Y\| | \|X\| + \|Y\| + \|Z\| | \|L\| - \|Z\| |
+| X - Y - Z - L<sub>X</sub> - L<sub>Y</sub> - L' - X - Y - R' | = reconfiguration 5 | | total = | \|L\| + \|X\| + \|Y\| - \|Z\| |
 
-	| S | L | M | R |
-	|---|---|---|---|
-	| 1 2 3 4 | 6 8 10 | | 5 7 9 |
+- eliminates M
+- works for all |L|
 
-	This solution moves |L| + |M| - 1 values, but:
-	- removes M, allowing the algorithm to run more efficiently for a few steps, and
-	- may also place a few additional values in their final place, i.e. all the M values that are less than R<sub>0</sub>
+Method C2:
 
-4. Swap all of M with the prefix of L
+| Sequence | Step | Total moves | Final moves | Net moves |
+|---|---|---|---|---|
+| Z - L<sub>X</sub> - L<sub>Y</sub> - L' - Y - X - R' | rotate Z - L<sub>X</sub> - L<sub>Y</sub> - L' - Y to Y - Z - L<sub>X</sub> - L<sub>Y</sub> - L' | \|Z\| + \|X\| + \|Y\| + (\|L\| - \|X\| - \|Y\| - \|Z\|) + \|Y\| | 0 | \|L\| + \|Y\| |
+| Y - Z - L<sub>X</sub> - L<sub>Y</sub> - L' - X - R' | rotate Y - Z - L<sub>X</sub> - L<sub>Y</sub> - L' - X to X - Y - Z - L<sub>X</sub> - L<sub>Y</sub> - L'  | \|Y\| + \|Z\| + \|X\| + \|Y\| + (\|L\| - \|X\| - \|Y\| - \|Z\|) + |X\| | \|X\| + \|Y\| + \|Z\| | \|L\| - \|Z\| |
+| X - Y - Z - L<sub>X</sub> - L<sub>Y</sub> - L' - R' | = reconfiguration 5 | | total = | 2\|L\| + \|Y\| - \|Z\| |
 
-	| S | L | M | R |
-	|---|---|---|---|
-	| 1 2 3 | 4 6 | 8 10 | 5 7 9 |
+- fewer moves than Method C1 if:
+	- 2|L| + |Y| - |Z| < |L| + |X| + |Y| - |Z|
+	- 2|L| < |L| + |X|
+	- |L| < |X|
+- works for all |L|
 
-	This solution moves 2|M| - 1 values, with the second advantage from solution 3. If |L| <= |M|, use solution 3 instead.  Note, this is the operation performed above when |M| = 1.
+Method C3:
 
-5. Partition M by R<sub>0</sub>, perform solution 4 on the left partition of M, and shift the rest of M down to make room for L.
+| Sequence | Step | Total moves | Final moves | Net moves |
+|---|---|---|---|---|
+| Z - L<sub>X</sub> - L<sub>Y</sub> - L' - Y - X - R' | rotate Y - X to X - Y | \|X\| + \|Y\| | 0 | \|X\| + \|Y\| |
+| Z - L<sub>X</sub> - L<sub>Y</sub> - L' - X - Y - R' | rotate Z - L<sub>X</sub> - L<sub>Y</sub> to L<sub>X</sub> - L<sub>Y</sub> - Z | \|Z\| + \|X\| + \|Y\| | \|Z\| | \|X\| + \|Y\| |
+| L<sub>X</sub> - L<sub>Y</sub> - Z - L' - X - Y - R' | swap L<sub>X</sub> - L<sub>Y</sub> with X - Y | 2\|X\| + 2\|Y\| | \|X\| + \|Y\| | \|X\| + \|Y\| |
+| X - Y - Z - L' - L<sub>X</sub> - L<sub>Y</sub> - R' | = reconfiguration 7 | | total = | 3\|X\| + 3\|Y\| |
 
-	| S | L | M | R |
-	|---|---|---|---|
-	| 1 2 3 4 | 10 | 6 8 | 5 7 9 |
+- requires |L| >= |X| + |Y|
+- fewer moves than Method C1 if:
+	- 3|X| + 3|Y| < |L| + |X| + |Y| - |Z|
+	- 2|X| + 2|Y| < |L| - |Z|
+	- 2|X| + 2|Y| + |Z| < |L|
+	- |L| > 2|X| + 2|Y| + |Z|
+- fewer moves than Method C2 if:
+	- 3|X| + 3|Y| < 2|L| + |Y| - |Z|
+	- 3|X| + 2|Y| < 2|L| - |Z|
+	- 3|X| + 2|Y| + |Z| < 2|L|
+	- 1.5|X| + |Y| + 0.5|Z| < |L|
+	- |L| > 1.5|X| + |Y| + 0.5|Z|
 
-	This solution moves |M| values, and provides the information that R<sub>0</sub> is the next lowest value.
+Algorithm C:
 
-	It does require additional comparisons of R<sub>0</sub> with M. However, these comparisons would likely be done later, as M and R continued to be compared.
+```
+find X where M<sub>0</sub> < R
+if |X| == |R|:
+	if |L| < |R|:
+		Method B1
+	else:
+		Method B2
+	merge completed
+else:
+	find Y where R'<sub>0</sub> < M
+	if |Y| == |M|:
+		find Z where R'<sub>0</sub> < L
+		if |L| < |X|:
+			Method C2
+		elif |L| < 2|X| + 2|Y| + |Z|
+			Method C1
+		else:
+			Method C3
+	if |L| < |X|:
+		Method A3
+	else if |L| < |M| + 2|X| + |Y|:
+		Method A2
+	else:
+		Method A1
+```
 
-6. Partition M by R<sub>0</sub>, and shift L right to make space for the left partition of M.
+One final special case, where |Z| == |L| (i.e. R'<sub>0</sub> > L<sub>i</sub> for all i).
+We need to reconfigure Z - Y - X - R' to X - Y - Z - R' as a final step to fully merged sequences.
 
-	| S | L | M | R |
-	|---|---|---|---|
-	| 1 2 3 4 | 10 | 6 8 | 5 7 9 |
+Method D1
 
-	This solution moves |L| values, and provides the information that R<sub>0</sub> is the next lowest value.
+| Sequence | Step | Total moves | Final moves | Net moves |
+|---|---|---|---|---|
+| Z - Y - X - R' | rotate Z - Y to Y - Z | \|Z\| + \|Y\| | 0 | \|Z\| + \|Y\| |
+| Y - Z - X - R' | rotate Y - Z - X to X - Y - Z | \|Y\| + \|Z\| + \|X\| | \|Y\| + \|Z\| + \|X\| | 0 |
+| X - Y - Z - R' | | | total = | \|Z\| + \|Y\| |
 
+Method D2
 
-7. Select 5 and 6 based on the relative lengths of L and M.
+| Sequence | Step | Total moves | Final moves | Net moves |
+|---|---|---|---|---|
+| Z - Y - X - R' | rotate Y - X to X - Y | \|Y\| + \|X\| | 0 | \|Y\| + \|X\| |
+| Z - X - Y - R' | rotate Z - X - Y to X - Y - Z | \|Z\| + \|X\| + \|Y\| | \|Z\| + \|X\| + \|Y\| | 0 |
+| X - Y - Z - R' | | | total = | \|Y\| + \|X\| |
 
-After solutions 5, 6, and 7 we now know that R<sub>0</sub> < M<sub>0</sub>. We can search for M<sub>0</sub> in R to speed up swapping.
+- fewer moves than Method D1 if:
+	- \|Y\| + \|X\| < \|Z\| + \|Y\|
+	- \|X\| < \|Z\|
 
-Splitting the blocks this way allows us to use binary search to find the location of M<sub>0</sub> in R or vice versa.
+Algorithm D:
 
-So, we can switch back and forth between the M and R blocks, terminating when one of the blocks is empty.  (It is also possible for L to become empty first, in which case we relabel M as L and continue).
+```
+find X where M<sub>0</sub> < R
+if |X| == |R|:
+	if |L| < |R|:
+		Method B1
+	else:
+		Method B2
+	merge completed
+else:
+	find Y where R'<sub>0</sub> < M
+	if |Y| == |M|:
+		find Z where R'<sub>0</sub> < L
+		if |Z| == |L|:
+			if |X| < |Z|:
+				Method D2
+			else:
+				Method D1
+			merge completed
+		if |L| < |X|:
+			Method C2
+		elif |L| < 2|X| + 2|Y| + |Z|
+			Method C1
+		else:
+			Method C3
+	if |L| < |X|:
+		Method A3
+	else if |L| < |M| + 2|X| + |Y|:
+		Method A2
+	else:
+		Method A1
+```
 
-An additional possibility: when we search for R<sub>0</sub> in M using binary search, actually search M-L and perform different steps if the insertion point is found in L.
+Note, since Method A3 does not split Y - M', we can perform Method A3 after finding |X|, and then search all of M-L for new split point, rather than just M.
+Whether this is an improvement needs to be investigated.
