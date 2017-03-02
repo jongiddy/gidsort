@@ -12,7 +12,7 @@ Most attempts to create an in-place mergesort either lose the property of stabil
 
 A common pattern for in-place mergesorts is to break the structure into √n sized blocks and move the highest values to one end to create a workspace with which to perform a standard merge on each block.
 
-The algorithm here avoids that approach, and starts with the observation that for a merge of two ordered sequences L = {L<sub>0</sub>...l<sub>|L|</sub>} and R = {R<sub>0</sub>...r<sub>|R|</sub>}:
+The algorithm here avoids that approach, and starts with the observation that for a merge of two ordered sequences L = {L<sub>0</sub>...l<sub>|L|-1</sub>} and R = {R<sub>0</sub>...r<sub>|R|-1</sub>}:
 
 | S |      L      |   R   |
 |---|-------------|-------|
@@ -198,7 +198,7 @@ Method B1
 |---|---|---|---|---|
 | L - M - R | rotate L - M to M - L | \|L\| + \|M\| | 0 | \|L\| + \|M\| |
 | M - L - R | rotate M - L - R to R - M - L | \|M\| + \|L\| + \|R\| | \|M\| + \|L\| + \|R\| | 0 |
-| R - L - M | | | total = | \|L\| + \|M\| |
+| R - M - L | | | total = | \|L\| + \|M\| |
 
 Method B2
 
@@ -206,7 +206,7 @@ Method B2
 |---|---|---|---|---|
 | L - M - R | rotate M - R to R - M | \|M\| + \|R\| | 0 | \|M\| + \|R\| |
 | L - R - M | rotate L - R - M to R - M - L | \|L\| + \|R\| + \|M\| | \|L\| + \|R\| + \|M\| | 0 |
-| R - L - M | | | total = | \|M\| + \|R\| |
+| R - M - L | | | total = | \|M\| + \|R\| |
 
 - fewer moves than Method B1 if:
 	- \|M\| + \|R\| < \|L\| + \|M\|
@@ -269,7 +269,7 @@ Method C1
 | Sequence | Step | Total moves | Final moves | Net moves |
 |---|---|---|---|---|
 | Z - L<sub>X</sub> - L<sub>Y</sub> - L' - Y - X - R' | rotate Y - X to X - Y | \|X\| + \|Y\| | 0 | \|X\| + \|Y\| |
-| Z - L<sub>X</sub> - L<sub>Y</sub> - L' - X - Y - R' | rotate Z - L<sub>X</sub> - L<sub>Y</sub> - L' - X - Y to X - Y - Z - L<sub>X</sub> - L<sub>Y</sub> - L'  | \|Z\| + \|X\| + \|Y\| + (\|L\| - \|X\| - \|Y\| - \|Z\|) + |X\| + \|Y\| | \|X\| + \|Y\| + \|Z\| | \|L\| - \|Z\| |
+| Z - L<sub>X</sub> - L<sub>Y</sub> - L' - X - Y - R' | rotate Z - L<sub>X</sub> - L<sub>Y</sub> - L' - X - Y to X - Y - Z - L<sub>X</sub> - L<sub>Y</sub> - L'  | \|Z\| + \|X\| + \|Y\| + (\|L\| - \|X\| - \|Y\| - \|Z\|) + \|X\| + \|Y\| | \|X\| + \|Y\| + \|Z\| | \|L\| - \|Z\| |
 | X - Y - Z - L<sub>X</sub> - L<sub>Y</sub> - L' - X - Y - R' | = reconfiguration 5 | | total = | \|L\| + \|X\| + \|Y\| - \|Z\| |
 
 - eliminates M
@@ -280,7 +280,7 @@ Method C2:
 | Sequence | Step | Total moves | Final moves | Net moves |
 |---|---|---|---|---|
 | Z - L<sub>X</sub> - L<sub>Y</sub> - L' - Y - X - R' | rotate Z - L<sub>X</sub> - L<sub>Y</sub> - L' - Y to Y - Z - L<sub>X</sub> - L<sub>Y</sub> - L' | \|Z\| + \|X\| + \|Y\| + (\|L\| - \|X\| - \|Y\| - \|Z\|) + \|Y\| | 0 | \|L\| + \|Y\| |
-| Y - Z - L<sub>X</sub> - L<sub>Y</sub> - L' - X - R' | rotate Y - Z - L<sub>X</sub> - L<sub>Y</sub> - L' - X to X - Y - Z - L<sub>X</sub> - L<sub>Y</sub> - L'  | \|Y\| + \|Z\| + \|X\| + \|Y\| + (\|L\| - \|X\| - \|Y\| - \|Z\|) + |X\| | \|X\| + \|Y\| + \|Z\| | \|L\| - \|Z\| |
+| Y - Z - L<sub>X</sub> - L<sub>Y</sub> - L' - X - R' | rotate Y - Z - L<sub>X</sub> - L<sub>Y</sub> - L' - X to X - Y - Z - L<sub>X</sub> - L<sub>Y</sub> - L'  | \|Y\| + \|Z\| + \|X\| + \|Y\| + (\|L\| - \|X\| - \|Y\| - \|Z\|) + \|X\| | \|X\| + \|Y\| + \|Z\| | \|L\| - \|Z\| |
 | X - Y - Z - L<sub>X</sub> - L<sub>Y</sub> - L' - R' | = reconfiguration 5 | | total = | 2\|L\| + \|Y\| - \|Z\| |
 
 - fewer moves than Method C1 if:
