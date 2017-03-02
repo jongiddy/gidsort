@@ -216,7 +216,7 @@ Method B2
 Algorithm B:
 
 ```
-find X where M<sub>0</sub> < R
+find X in R where M[0] < R
 if |X| == |R|:
 	if |L| < |R|:
 		Method B1
@@ -224,7 +224,7 @@ if |X| == |R|:
 		Method B2
 	merge completed
 else:
-	find Y where R'<sub>0</sub> < M
+	find Y in M where R'[0] < M
 	if |L| < |X|:
 		Method A3
 	else if |L| < |M| + 2|X| + |Y|:
@@ -314,7 +314,7 @@ Method C3:
 Algorithm C:
 
 ```
-find X where M<sub>0</sub> < R
+find X in R where M[0] < R
 if |X| == |R|:
 	if |L| < |R|:
 		Method B1
@@ -322,21 +322,22 @@ if |X| == |R|:
 		Method B2
 	merge completed
 else:
-	find Y where R'<sub>0</sub> < M
+	find Y in M where R'[0] < M
 	if |Y| == |M|:
-		find Z where R'<sub>0</sub> < L
+		find Z in L where R'[0] < L
 		if |L| < |X|:
 			Method C2
 		elif |L| < 2|X| + 2|Y| + |Z|
 			Method C1
 		else:
 			Method C3
-	if |L| < |X|:
-		Method A3
-	else if |L| < |M| + 2|X| + |Y|:
-		Method A2
 	else:
-		Method A1
+		if |L| < |X|:
+			Method A3
+		else if |L| < |M| + 2|X| + |Y|:
+			Method A2
+		else:
+			Method A1
 ```
 
 One final special case, where |Z| == |L| (i.e. R'<sub>0</sub> > L<sub>i</sub> for all i).
@@ -365,7 +366,7 @@ Method D2
 Algorithm D:
 
 ```
-find X where M<sub>0</sub> < R
+find X in R where M[0] < R
 if |X| == |R|:
 	if |L| < |R|:
 		Method B1
@@ -373,28 +374,27 @@ if |X| == |R|:
 		Method B2
 	merge completed
 else:
-	find Y where R'<sub>0</sub> < M
+	find Y in M where R'[0] < M
 	if |Y| == |M|:
-		find Z where R'<sub>0</sub> < L
+		find Z in L where R'[0] < L
 		if |Z| == |L|:
 			if |X| < |Z|:
 				Method D2
 			else:
 				Method D1
 			merge completed
-		if |L| < |X|:
-			Method C2
-		elif |L| < 2|X| + 2|Y| + |Z|
-			Method C1
 		else:
-			Method C3
-	if |L| < |X|:
-		Method A3
-	else if |L| < |M| + 2|X| + |Y|:
-		Method A2
+			if |L| < |X|:
+				Method C2
+			elif |L| < 2|X| + 2|Y| + |Z|
+				Method C1
+			else:
+				Method C3
 	else:
-		Method A1
+		if |L| < |X|:
+			Method A3
+		else if |L| < |M| + 2|X| + |Y|:
+			Method A2
+		else:
+			Method A1
 ```
-
-Note, since Method A3 does not split Y - M', we can perform Method A3 after finding |X|, and then search all of M-L for new split point, rather than just M.
-Whether this is an improvement needs to be investigated.
