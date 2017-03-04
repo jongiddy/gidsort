@@ -398,3 +398,209 @@ else:
 		else:
 			Method A1
 ```
+
+We should look at how we deal with the situation where |M| == 0.
+This is the initial situation, and will occur at times throughout the algorithm.
+
+
+Starting with an empty M:
+
+| S | L | M | R |
+|---|---|---|---|
+| S | Z - L<sub>X</sub> - L' |  | X - R' |
+
+we want to end up with X and Z appended to S, and our invariants kept: each of L, M, and R ordered internally and M < L.  There are 2 reconfigurations that give this:
+
+Configuration 8:
+
+| S | L | M | R |
+|---|---|---|---|
+| S - X - Z | L<sub>X</sub> - L' |  | R' |
+
+- keeps empty M
+
+Configuration 9:
+
+| S | L | M | R |
+|---|---|---|---|
+| S - X - Z | L' | L<sub>X</sub> | R' |
+
+- does not move L'
+
+Method E1:
+
+| Sequence | Step | Total moves | Final moves | Net moves |
+|---|---|---|---|---|
+| Z - L<sub>X</sub> - L' - X - R' | rotate Z - L<sub>X</sub> - L' - X to X - Z - L<sub>X</sub> - L' - X | \|L\| + \|X\| | \|X\| + \|Z\| | \|L\| - \|Z\| |
+| X - Z - L<sub>X</sub> - L' - R' | = reconfiguration 8 | | total = | \|L\| - \|Z\| |
+
+- works for all |L|
+- keeps M empty
+
+Method E2:
+
+| Sequence | Step | Total moves | Final moves | Net moves |
+|---|---|---|---|---|
+| Z - L<sub>X</sub> - L' - X - R' | swap L<sub>X</sub> with X | 2\|X\| | 0 | 2\|X\| |
+| Z - X - L' - L<sub>X</sub> - R' | rotate Z - X to X - Z | \|Z\| + \|X\| | \|Z\| + \|X\| | 0 |
+| X - Z - L' - L<sub>X</sub> - R' | = reconfiguration 9 | | total = | 2\|X\| |
+
+- works when |L| >= |X|
+- fewer moves than Method E2 when 2|X| < |L| - |Z|
+
+Algorithm E:
+
+```
+loop:
+	find X in R where L[0] < R
+	find Z in L where R'[0] < L
+	if |L| < 2|X| + |Z|:
+		Method E1
+	else:
+		Method E2
+		while |M| > 0:
+			find X in R where M[0] < R
+			if |X| == |R|:
+				if |L| < |R|:
+					Method B1
+				else:
+					Method B2
+				merge completed
+			else:
+				find Y in M where R'[0] < M
+				if |Y| == |M|:
+					find Z in L where R'[0] < L
+					if |Z| == |L|:
+						if |X| < |Z|:
+							Method D2
+						else:
+							Method D1
+						merge completed
+					else:
+						if |L| < |X|:
+							Method C2
+						elif |L| < 2|X| + 2|Y| + |Z|
+							Method C1
+						else:
+							Method C3
+				else:
+					if |L| < |X|:
+						Method A3
+					else if |L| < |M| + 2|X| + |Y|:
+						Method A2
+					else:
+						Method A1
+```
+
+Special cases for |M| == 0.
+
+If |X| == |R| (L<sub>0</sub> > R<sub>i</sub> for all i), then we simply need to reconfigure L - R to R - L as a final step to fully merged sequences.
+
+If |Z| == |L| (R'<sub>0</sub> > L<sub>i</sub> for all i), then we simply need to reconfigure Z - X to X - Z as a final step to fully merged sequences.
+
+Algorithm F:
+
+```
+loop:
+	find X in R where L[0] < R
+	if |X| == |R|:
+		swap(L, R)
+		merge completed
+	else:
+		find Z in L where R'[0] < L
+		if |Z| == |R|:
+			swap(Z, X)
+			merge completed
+		else if |L| < 2|X| + |Z|:
+			Method E1
+		else:
+			Method E2
+			while |M| > 0:
+				find X in R where M[0] < R
+				if |X| == |R|:
+					if |L| < |R|:
+						Method B1
+					else:
+						Method B2
+					merge completed
+				else:
+					find Y in M where R'[0] < M
+					if |Y| == |M|:
+						find Z in L where R'[0] < L
+						if |Z| == |L|:
+							if |X| < |Z|:
+								Method D2
+							else:
+								Method D1
+							merge completed
+						else:
+							if |L| < |X|:
+								Method C2
+							elif |L| < 2|X| + 2|Y| + |Z|
+								Method C1
+							else:
+								Method C3
+					else:
+						if |L| < |X|:
+							Method A3
+						else if |L| < |M| + 2|X| + |Y|:
+							Method A2
+						else:
+							Method A1
+```
+
+Note that Methods A3, B1, C2, and D1, are all triggered when |L| < |X|.
+All methods also involve a rotation of M back into L.
+
+Since we can check |L| < |X| before we find Y in M, we can perform this initial rotation early.
+This allows us to search M-L as a single operation, rather than searching M and then L.
+
+However, using the current algorithm, this may mean we find X in R as part of the |M| > 0 loop
+and then search for it again when we drop back into the main loop.
+To avoid, this we can make knowledge of X an invariant, moving it around to ensure it is known at the start of each loop.
+
+Algorithm G:
+
+```
+find X in R where L[0] < R
+loop:
+	if |X| == |R|:
+		swap(L, R)
+		merge completed
+	else:
+		find Z in L where R'[0] < L
+		if |Z| == |R|:
+			swap(Z, X)
+			merge completed
+		else if |L| < 2|X| + |Z|:
+			Method E1
+		else:
+			Method E2
+			find X in R where M[0] < R
+			while |M| > 0:
+				if |L| < |X|:
+					swap(L, M)
+					# merge M-L to L, and X still valid
+					break
+				else if |X| == |R|:
+					Method B2
+					merge completed
+				else:
+					find Y in M where R'[0] < M
+					if |Y| == |M|:
+						find Z in L where R'[0] < L
+						if |Z| == |L|:
+							Method D1
+							merge completed
+						else:
+							if |L| < 2|X| + 2|Y| + |Z|
+								Method C1
+							else:
+								Method C3
+					else:
+						if |L| < |M| + 2|X| + |Y|:
+							Method A2
+						else:
+							Method A1
+					find X in R where M[0] < R
+```
