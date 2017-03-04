@@ -216,7 +216,7 @@ Method B2:
 Algorithm B:
 
 ```
-find X in R where M[0] < R
+find X in R where X[i] < M[0]
 if |X| == |R|:
 	if |L| < |R|:
 		Method B1
@@ -224,7 +224,7 @@ if |X| == |R|:
 		Method B2
 	merge completed
 else:
-	find Y in M where R'[0] < M
+	find Y in M where Y[i] < R'[0]
 	if |L| < |X|:
 		Method A3
 	else if |L| < |M| + 2|X| + |Y|:
@@ -314,7 +314,7 @@ Method C3:
 Algorithm C:
 
 ```
-find X in R where M[0] < R
+find X in R where X[i] < M[0]
 if |X| == |R|:
 	if |L| < |R|:
 		Method B1
@@ -322,9 +322,9 @@ if |X| == |R|:
 		Method B2
 	merge completed
 else:
-	find Y in M where R'[0] < M
+	find Y in M where Y[i] < R'[0]
 	if |Y| == |M|:
-		find Z in L where R'[0] < L
+		find Z in L where Z[i] < R'[0]
 		if |L| < |X|:
 			Method C2
 		elif |L| < 2|X| + 2|Y| + |Z|
@@ -366,7 +366,7 @@ Method D2:
 Algorithm D:
 
 ```
-find X in R where M[0] < R
+find X in R where X[i] < M[0]
 if |X| == |R|:
 	if |L| < |R|:
 		Method B1
@@ -374,9 +374,9 @@ if |X| == |R|:
 		Method B2
 	merge completed
 else:
-	find Y in M where R'[0] < M
+	find Y in M where Y[i] < R'[0]
 	if |Y| == |M|:
-		find Z in L where R'[0] < L
+		find Z in L where Z[i] < R'[0]
 		if |Z| == |L|:
 			if |X| < |Z|:
 				Method D2
@@ -452,14 +452,14 @@ Algorithm E:
 
 ```
 loop:
-	find X in R where L[0] < R
-	find Z in L where R'[0] < L
+	find X in R where X[i] < L[0]
+	find Z in L where Z[i] < R'[0]
 	if |L| < 2|X| + |Z|:
 		Method E1
 	else:
 		Method E2
 		while |M| > 0:
-			find X in R where M[0] < R
+			find X in R where X[i] < M[0]
 			if |X| == |R|:
 				if |L| < |R|:
 					Method B1
@@ -467,9 +467,9 @@ loop:
 					Method B2
 				merge completed
 			else:
-				find Y in M where R'[0] < M
+				find Y in M where Y[i] < R'[0]
 				if |Y| == |M|:
-					find Z in L where R'[0] < L
+					find Z in L where Z[i] < R'[0]
 					if |Z| == |L|:
 						if |X| < |Z|:
 							Method D2
@@ -502,12 +502,12 @@ Algorithm F:
 
 ```
 loop:
-	find X in R where L[0] < R
+	find X in R where X[i] < L[0]
 	if |X| == |R|:
 		rotate(L, R)
 		merge completed
 	else:
-		find Z in L where R'[0] < L
+		find Z in L where Z[i] < R'[0]
 		if |Z| == |L|:
 			rotate(Z, X)
 			merge completed
@@ -516,7 +516,7 @@ loop:
 		else:
 			Method E2
 			while |M| > 0:
-				find X in R where M[0] < R
+				find X in R where X[i] < M[0]
 				if |X| == |R|:
 					if |L| < |R|:
 						Method B1
@@ -524,9 +524,9 @@ loop:
 						Method B2
 					merge completed
 				else:
-					find Y in M where R'[0] < M
+					find Y in M where Y[i] < R'[0]
 					if |Y| == |M|:
-						find Z in L where R'[0] < L
+						find Z in L where Z[i] < R'[0]
 						if |Z| == |L|:
 							if |X| < |Z|:
 								Method D2
@@ -562,13 +562,14 @@ To avoid, this we can make knowledge of X an invariant, moving it around to ensu
 Algorithm G:
 
 ```
-find X in R where L[0] < R
+find X in R where X[i] < L[0]
 loop:
+	assert |M| == 0
 	if |X| == |R|:
 		rotate(L, R)
 		merge completed
 	else:
-		find Z in L where R'[0] < L
+		find Z in L where Z[i] < R'[0]
 		if |Z| == |L|:
 			rotate(Z, X)
 			merge completed
@@ -576,19 +577,20 @@ loop:
 			Method E1
 		else:
 			Method E2
-			find X in R where M[0] < R
-			while |M| > 0:
+			find X in R where X[i] < M[0]
+			loop:
+				assert |M| > 0:
 				if |L| < |X|:
-					swap(L, M)
+					rotate(L, M)
 					# merge M-L to L, and X still valid
 					break
 				else if |X| == |R|:
 					Method B2
 					merge completed
 				else:
-					find Y in M where R'[0] < M
+					find Y in M where Y[i] < R'[0]
 					if |Y| == |M|:
-						find Z in L where R'[0] < L
+						find Z in L where Z[i] < R'[0]
 						if |Z| == |L|:
 							Method D1
 							merge completed
@@ -596,7 +598,7 @@ loop:
 							if |L| < 2|X| + 2|Y| + |Z|
 								Method C1
 								# Method C1 eliminates M
-								find X in R where L[0] < R
+								find X in R where X[i] < L[0]
 								break
 							else:
 								Method C3
@@ -605,5 +607,5 @@ loop:
 							Method A2
 						else:
 							Method A1
-					find X in R where M[0] < R
+					find X in R where X[i] < M[0]
 ```
