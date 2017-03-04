@@ -192,7 +192,7 @@ There are some special cases to consider.
 
 If |X| == |R| (M<sub>0</sub> > R<sub>i</sub> for all i), then we simply need to reconfigure L - M - R to R - M - L as a final step to fully merged sequences.
 
-Method B1
+Method B1:
 
 | Sequence | Step | Total moves | Final moves | Net moves |
 |---|---|---|---|---|
@@ -200,7 +200,7 @@ Method B1
 | M - L - R | rotate M - L - R to R - M - L | \|M\| + \|L\| + \|R\| | \|M\| + \|L\| + \|R\| | 0 |
 | R - M - L | | | total = | \|L\| + \|M\| |
 
-Method B2
+Method B2:
 
 | Sequence | Step | Total moves | Final moves | Net moves |
 |---|---|---|---|---|
@@ -264,7 +264,7 @@ Configuration 7:
 |---|---|---|---|
 | S - X - Y - Z | L' | L<sub>X</sub> - L<sub>Y</sub> | R' |
 
-Method C1
+Method C1:
 
 | Sequence | Step | Total moves | Final moves | Net moves |
 |---|---|---|---|---|
@@ -343,7 +343,7 @@ else:
 One final special case, where |Z| == |L| (i.e. R'<sub>0</sub> > L<sub>i</sub> for all i).
 We need to reconfigure Z - Y - X - R' to X - Y - Z - R' as a final step to fully merged sequences.
 
-Method D1
+Method D1:
 
 | Sequence | Step | Total moves | Final moves | Net moves |
 |---|---|---|---|---|
@@ -351,7 +351,7 @@ Method D1
 | Y - Z - X - R' | rotate Y - Z - X to X - Y - Z | \|Y\| + \|Z\| + \|X\| | \|Y\| + \|Z\| + \|X\| | 0 |
 | X - Y - Z - R' | | | total = | \|Z\| + \|Y\| |
 
-Method D2
+Method D2:
 
 | Sequence | Step | Total moves | Final moves | Net moves |
 |---|---|---|---|---|
@@ -504,12 +504,12 @@ Algorithm F:
 loop:
 	find X in R where L[0] < R
 	if |X| == |R|:
-		swap(L, R)
+		rotate(L, R)
 		merge completed
 	else:
 		find Z in L where R'[0] < L
-		if |Z| == |R|:
-			swap(Z, X)
+		if |Z| == |L|:
+			rotate(Z, X)
 			merge completed
 		else if |L| < 2|X| + |Z|:
 			Method E1
@@ -565,12 +565,12 @@ Algorithm G:
 find X in R where L[0] < R
 loop:
 	if |X| == |R|:
-		swap(L, R)
+		rotate(L, R)
 		merge completed
 	else:
 		find Z in L where R'[0] < L
-		if |Z| == |R|:
-			swap(Z, X)
+		if |Z| == |L|:
+			rotate(Z, X)
 			merge completed
 		else if |L| < 2|X| + |Z|:
 			Method E1
