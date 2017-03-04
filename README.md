@@ -595,6 +595,9 @@ loop:
 						else:
 							if |L| < 2|X| + 2|Y| + |Z|
 								Method C1
+								# Method C1 eliminates M
+								find X in R where L[0] < R
+								break
 							else:
 								Method C3
 					else:
