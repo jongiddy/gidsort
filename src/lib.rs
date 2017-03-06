@@ -87,12 +87,6 @@ fn insertion_point<T, F>(value: &T, buffer: &[T], compare: &F, when_equal: Order
     lo
 }
 
-fn swap_sequence<T>(s: &mut [T], a: usize, b: usize, k: usize) {
-    for i in 0..k {
-        s.swap(a + i, b + i)
-    }
-}
-
 fn swap_ends<T>(s: &mut [T], k: usize) {
     // Swap front k items of sequence with back k items
     debug_assert!(k <= s.len() / 2);
@@ -764,23 +758,23 @@ mod tests {
     }
 
     #[test]
-    fn swap_sequence_adjacent() {
+    fn swap_ends_adjacent() {
         let mut buf = [1, 2, 3, 4, 5, 6];
-        super::swap_sequence(&mut buf, 0, 3, 3);
+        super::swap_ends(&mut buf, 3);
         assert_eq!(buf, [4, 5, 6, 1, 2, 3]);
     }
 
     #[test]
-    fn swap_sequence_disjoint() {
+    fn swap_ends_disjoint() {
         let mut buf = [1, 2, 3, 4, 5, 6];
-        super::swap_sequence(&mut buf, 1, 4, 2);
+        super::swap_ends(&mut buf[1..6], 2);
         assert_eq!(buf, [1, 5, 6, 4, 2, 3]);
     }
 
     #[test]
-    fn swap_sequence_zero() {
+    fn swap_ends_zero() {
         let mut buf = [1, 2, 3, 4, 5, 6];
-        super::swap_sequence(&mut buf, 0, 3, 0);
+        super::swap_ends(&mut buf, 0);
         assert_eq!(buf, [1, 2, 3, 4, 5, 6]);
     }
 
