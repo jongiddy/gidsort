@@ -270,7 +270,7 @@ Method C1:
 |---|---|---|---|---|
 | Z - L<sub>X</sub> - L<sub>Y</sub> - L' - Y - X - R' | rotate Y - X to X - Y | \|X\| + \|Y\| | 0 | \|X\| + \|Y\| |
 | Z - L<sub>X</sub> - L<sub>Y</sub> - L' - X - Y - R' | rotate Z - L<sub>X</sub> - L<sub>Y</sub> - L' - X - Y to X - Y - Z - L<sub>X</sub> - L<sub>Y</sub> - L'  | \|Z\| + \|X\| + \|Y\| + (\|L\| - \|X\| - \|Y\| - \|Z\|) + \|X\| + \|Y\| | \|X\| + \|Y\| + \|Z\| | \|L\| - \|Z\| |
-| X - Y - Z - L<sub>X</sub> - L<sub>Y</sub> - L' - X - Y - R' | = reconfiguration 5 | | total = | \|L\| + \|X\| + \|Y\| - \|Z\| |
+| X - Y - Z - L<sub>X</sub> - L<sub>Y</sub> - L' - R' | = reconfiguration 5 | | total = | \|L\| + \|X\| + \|Y\| - \|Z\| |
 
 - eliminates M
 - works for all |L|
@@ -431,7 +431,7 @@ Method E1:
 
 | Sequence | Step | Total moves | Final moves | Net moves |
 |---|---|---|---|---|
-| Z - L<sub>X</sub> - L' - X - R' | rotate Z - L<sub>X</sub> - L' - X to X - Z - L<sub>X</sub> - L' - X | \|L\| + \|X\| | \|X\| + \|Z\| | \|L\| - \|Z\| |
+| Z - L<sub>X</sub> - L' - X - R' | rotate Z - L<sub>X</sub> - L' - X to X - Z - L<sub>X</sub> - L' | \|L\| + \|X\| | \|X\| + \|Z\| | \|L\| - \|Z\| |
 | X - Z - L<sub>X</sub> - L' - R' | = reconfiguration 8 | | total = | \|L\| - \|Z\| |
 
 - works for all |L|
@@ -575,6 +575,7 @@ loop:
 			merge completed
 		else if |L| < 2|X| + |Z|:
 			Method E1
+			find X in R where X[i] < L[0]
 		else:
 			Method E2
 			find X in R where X[i] < M[0]
@@ -592,7 +593,7 @@ loop:
 					if |Y| == |M|:
 						find Z in L where Z[i] < R'[0]
 						if |Z| == |L|:
-							Method D1
+							Method D2
 							merge completed
 						else:
 							if |L| < 2|X| + 2|Y| + |Z|
