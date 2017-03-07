@@ -256,6 +256,13 @@ fn merge<T, F>(s: &mut [T], split: usize, compare: &F, leftright: Ordering, righ
             l0 += xlen + zlen;
             m0 += xlen;
             r0 = m0;
+            if m0 - l0 == 1 || r1 - r0 == 1 {
+                // since r_0 is smallest value, if |R| = 1, we just need to swap L and R
+                // since l_max is largest value, if |L| = 1, we just need to swap L and R
+                rotate(&mut s[l0 .. r1], r1 - r0);
+                return;
+            }
+            debug_assert!(r0 + 1 < r1);
             xlen = insertion_point(&s[l0], &s[r0 + 1 .. r1], compare, leftright) + 1;
         }
         else {
@@ -266,9 +273,16 @@ fn merge<T, F>(s: &mut [T], split: usize, compare: &F, leftright: Ordering, righ
             rotate(&mut s[l0 .. l0 + zlen + xlen], xlen);
             l0 += xlen + zlen;
             r0 += xlen;
+            if r1 - r0 == 1 {
+                // since r_0 is smallest value, if |R| = 1, rotate L-M-R to R-M-L
+                rotate(&mut s[m0 .. r1], r1 - r0);
+                rotate(&mut s[l0 .. r1], r1 - m0);
+                return;
+            }
             // assert |M| > 0 and R[0] is minimum
             debug_assert!(r0 - m0 > 0); // |M| > 0
             // find X in R where X[i] < M[0]
+            debug_assert!(r0 + 1 < r1);
             xlen = insertion_point(&s[m0], &s[r0 + 1 .. r1], compare, leftright) + 1;
             loop {
                 if m0 - l0 < xlen {
@@ -309,6 +323,13 @@ fn merge<T, F>(s: &mut [T], split: usize, compare: &F, leftright: Ordering, righ
                             r0 += xlen;
                             m0 = r0;
                             // find X in R where X[i] < L[0]
+                            if m0 - l0 == 1 || r1 - r0 == 1 {
+                                // since r_0 is smallest value, if |R| = 1, we just need to swap L and R
+                                // since l_max is largest value, if |L| = 1, we just need to swap L and R
+                                rotate(&mut s[l0 .. r1], r1 - r0);
+                                return;
+                            }
+                            debug_assert!(r0 + 1 < r1);
                             xlen = insertion_point(&s[l0], &s[r0 + 1 .. r1], compare, leftright) + 1;
                             break
                         }
@@ -327,7 +348,14 @@ fn merge<T, F>(s: &mut [T], split: usize, compare: &F, leftright: Ordering, righ
                             l0 += xlen + ylen + zlen;
                             r0 += xlen;
                             m0 = r0;
+                            if m0 - l0 == 1 || r1 - r0 == 1 {
+                                // since r_0 is smallest value, if |R| = 1, we just need to swap L and R
+                                // since l_max is largest value, if |L| = 1, we just need to swap L and R
+                                rotate(&mut s[l0 .. r1], r1 - r0);
+                                return;
+                            }
                             // find X in R where X[i] < L[0]
+                            debug_assert!(r0 + 1 < r1);
                             xlen = insertion_point(&s[l0], &s[r0 + 1 .. r1], compare, leftright) + 1;
                             break
                         }
@@ -362,6 +390,13 @@ fn merge<T, F>(s: &mut [T], split: usize, compare: &F, leftright: Ordering, righ
                     }
                 }
                 debug_assert!(r0 - m0 > 0); // |M| > 0
+                if r1 - r0 == 1 {
+                    // since r_0 is smallest value, if |R| = 1, rotate L-M-R to R-M-L
+                    rotate(&mut s[m0 .. r1], r1 - r0);
+                    rotate(&mut s[l0 .. r1], r1 - m0);
+                    return;
+                }
+                debug_assert!(r0 + 1 < r1);
                 xlen = insertion_point(&s[m0], &s[r0 + 1 .. r1], compare, leftright) + 1;
             }
         }
