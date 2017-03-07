@@ -248,13 +248,6 @@ fn merge<T, F>(s: &mut [T], split: usize, compare: &F, leftright: Ordering, righ
         // - this search relies on invariant |L| > 1, tested in assert
         debug_assert!(l0 + 1 <= m0 - 1);
         let zlen = insertion_point(&s[r0 + xlen], &s[l0 + 1 .. m0 - 1], compare, rightleft) + 1;
-        if zlen == m0 - l0 {
-            // |Z| == |L|:
-            // rotate(Z, X)
-            rotate(&mut s[l0 .. r0 + xlen], xlen);
-            // merge completed
-            return
-        }
         if m0 - l0 < 2 * xlen + zlen {
             // |L| < 2|X| + |Z|:
             // Method E1
@@ -301,38 +294,52 @@ fn merge<T, F>(s: &mut [T], split: usize, compare: &F, leftright: Ordering, righ
                 if ylen == r0 - m0 {
                     // |Y| == |M|:
                     // find Z in L where Z[i] < R'[0]
-                    let zlen = insertion_point(&s[r0 + xlen], &s[l0 .. m0], compare, rightleft);
-                    // Methods D2, C1, and C3 all start with a rotate of Y - X
+                    let zlen = insertion_point(&s[r0 + xlen], &s[l0 .. m0 - 1], compare, rightleft);
+                    // Methods C1, C3, D1, and D3 all start with a rotate of Y - X
                     rotate(&mut s[m0 .. r0 + xlen], xlen);
-                    if zlen == m0 - l0 {
-                        // |Z| == |L|:
-                        // Method D2
+                    if zlen == 0 {
+                        // |Z| == 0:
+                        if m0 - l0 < xlen + ylen {
+                            // |L| < |X| + |Y|:
+                            // Method D1
+                            // rotate Y - X to X - Y
+                            // rotate LX - LY - L' - X - Y to X - Y - LX - LY - L'
+                            rotate(&mut s[l0 .. r0 + xlen], xlen + ylen);
+                            l0 += xlen + ylen;
+                            r0 += xlen;
+                            m0 = r0;
+                            // find X in R where X[i] < L[0]
+                            xlen = insertion_point(&s[l0], &s[r0 + 1 .. r1], compare, leftright) + 1;
+                            break
+                        }
+                        // Method D3
                         // rotate Y - X to X - Y
-                        // rotate Z - X - Y to X - Y - Z
-                        rotate(&mut s[l0 .. r0 + xlen], xlen + ylen);
-                        // merge completed
-                        return
-                    }
-                    if m0 - l0 < 2 * xlen + 2 * ylen + zlen {
-                        // Method C1
+                        // swap LX - LY with X - Y
+                        swap_ends(&mut s[l0 .. r0 + xlen], xlen + ylen);
+                        l0 += xlen + ylen;
+                        r0 += xlen;
+                    } else {
+                        if m0 - l0 < 2 * xlen + 2 * ylen + zlen {
+                            // Method C1
+                            // rotate Y - X to X - Y
+                            // rotate Z - LX - LY - L' - X - Y to X - Y - Z - LX - LY - L'
+                            rotate(&mut s[l0 .. r0 + xlen], xlen + ylen);
+                            l0 += xlen + ylen + zlen;
+                            r0 += xlen;
+                            m0 = r0;
+                            // find X in R where X[i] < L[0]
+                            xlen = insertion_point(&s[l0], &s[r0 + 1 .. r1], compare, leftright) + 1;
+                            break
+                        }
+                        // Method C3
                         // rotate Y - X to X - Y
-                        // rotate Z - LX - LY - L' - X - Y to X - Y - Z - LX - LY - L'
-                        rotate(&mut s[l0 .. r0 + xlen], xlen + ylen);
+                        // rotate Z - LX - LY to LX - LY - Z
+                        rotate(&mut s[l0 .. l0 + zlen + xlen + ylen], xlen + ylen);
+                        // swap LX - LY with X - Y
+                        swap_ends(&mut s[l0 .. r0 + xlen], xlen + ylen);
                         l0 += xlen + ylen + zlen;
                         r0 += xlen;
-                        m0 = r0;
-                        // find X in R where X[i] < L[0]
-                        xlen = insertion_point(&s[l0], &s[r0 + 1 .. r1], compare, leftright) + 1;
-                        break
                     }
-                    // Method C3
-                    // rotate Y - X to X - Y
-                    // rotate Z - LX - LY to LX - LY - Z
-                    rotate(&mut s[l0 .. l0 + zlen + xlen + ylen], xlen + ylen);
-                    // swap LX - LY with X - Y
-                    swap_ends(&mut s[l0 .. r0 + xlen], xlen + ylen);
-                    l0 += xlen + ylen + zlen;
-                    r0 += xlen;
                 } else {
                     if m0 - l0 < r0 - m0 + 2 * xlen + ylen {
                         // |L| < |M| + 2|X| + |Y|:

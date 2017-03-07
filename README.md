@@ -283,6 +283,7 @@ Method C2:
 | Y - Z - L<sub>X</sub> - L<sub>Y</sub> - L' - X - R' | rotate Y - Z - L<sub>X</sub> - L<sub>Y</sub> - L' - X to X - Y - Z - L<sub>X</sub> - L<sub>Y</sub> - L'  | \|Y\| + \|Z\| + \|X\| + \|Y\| + (\|L\| - \|X\| - \|Y\| - \|Z\|) + \|X\| | \|X\| + \|Y\| + \|Z\| | \|L\| - \|Z\| |
 | X - Y - Z - L<sub>X</sub> - L<sub>Y</sub> - L' - R' | = reconfiguration 5 | | total = | 2\|L\| + \|Y\| - \|Z\| |
 
+- eliminates M
 - fewer moves than Method C1 if:
 	- 2|L| + |Y| - |Z| < |L| + |X| + |Y| - |Z|
 	- 2|L| < |L| + |X|
@@ -340,28 +341,58 @@ else:
 			Method A1
 ```
 
-One final special case, where |Z| == |L| (i.e. R'<sub>0</sub> > L<sub>i</sub> for all i).
-We need to reconfigure Z - Y - X - R' to X - Y - Z - R' as a final step to fully merged sequences.
+We do not need to handle the case where |Z| == |L| (i.e. R'<sub>0</sub> > L<sub>i</sub> for all i). This can never occur since L<sub>|L|-1</sub> is the largest value.
+
+However, we can consider |Z| == 0 as a special case.
+
+We need to reconfigure L - Y - X - R' to X - Y - L - R' as a final step to fully merged sequences.
 
 Method D1:
 
 | Sequence | Step | Total moves | Final moves | Net moves |
 |---|---|---|---|---|
-| Z - Y - X - R' | rotate Z - Y to Y - Z | \|Z\| + \|Y\| | 0 | \|Z\| + \|Y\| |
-| Y - Z - X - R' | rotate Y - Z - X to X - Y - Z | \|Y\| + \|Z\| + \|X\| | \|Y\| + \|Z\| + \|X\| | 0 |
-| X - Y - Z - R' | | | total = | \|Z\| + \|Y\| |
+| L<sub>X</sub> - L<sub>Y</sub> - L' - Y - X - R' | rotate Y - X to X - Y | \|X\| + \|Y\| | 0 | \|X\| + \|Y\| |
+| L<sub>X</sub> - L<sub>Y</sub> - L' - X - Y - R' | rotate L<sub>X</sub> - L<sub>Y</sub> - L' - X - Y to X - Y - L<sub>X</sub> - L<sub>Y</sub> - L'  | \|X\| + \|Y\| + (\|L\| - \|X\| - \|Y\|) + \|X\| + \|Y\| | \|X\| + \|Y\| | \|L\| |
+| X - Y - L<sub>X</sub> - L<sub>Y</sub> - L' - R' | = reconfiguration 5 | | total = | \|L\| + \|X\| + \|Y\| |
+
+- eliminates M
+- works for all |L|
+- same steps and effort as C1
 
 Method D2:
 
 | Sequence | Step | Total moves | Final moves | Net moves |
 |---|---|---|---|---|
-| Z - Y - X - R' | rotate Y - X to X - Y | \|Y\| + \|X\| | 0 | \|Y\| + \|X\| |
-| Z - X - Y - R' | rotate Z - X - Y to X - Y - Z | \|Z\| + \|X\| + \|Y\| | \|Z\| + \|X\| + \|Y\| | 0 |
-| X - Y - Z - R' | | | total = | \|Y\| + \|X\| |
+| L<sub>X</sub> - L<sub>Y</sub> - L' - Y - X - R' | rotate L<sub>X</sub> - L<sub>Y</sub> - L' - Y to Y - L<sub>X</sub> - L<sub>Y</sub> - L' | \|X\| + \|Y\| + (\|L\| - \|X\| - \|Y\|) + \|Y\| | 0 | \|L\| + \|Y\| |
+| Y - L<sub>X</sub> - L<sub>Y</sub> - L' - X - R' | rotate Y - L<sub>X</sub> - L<sub>Y</sub> - L' - X to X - Y - L<sub>X</sub> - L<sub>Y</sub> - L'  | \|Y\| + \|X\| + \|Y\| + (\|L\| - \|X\| - \|Y\|) + \|X\| | \|X\| + \|Y\| | \|L\| |
+| X - Y - L<sub>X</sub> - L<sub>Y</sub> - L' - R' | = reconfiguration 5 | | total = | 2\|L\| + \|Y\| |
 
 - fewer moves than Method D1 if:
-	- \|Y\| + \|X\| < \|Z\| + \|Y\|
-	- \|X\| < \|Z\|
+	- 2|L| + |Y| < |L| + |X| + |Y|
+	- 2|L| < |L| + |X|
+	- |L| < |X|
+- works for all |L|
+- same steps as C2
+
+Method D3:
+
+| Sequence | Step | Total moves | Final moves | Net moves |
+|---|---|---|---|---|
+| L<sub>X</sub> - L<sub>Y</sub> - L' - Y - X - R' | rotate Y - X to X - Y | \|X\| + \|Y\| | 0 | \|X\| + \|Y\| |
+| L<sub>X</sub> - L<sub>Y</sub> - L' - X - Y - R' | swap L<sub>X</sub> - L<sub>Y</sub> with X - Y | 2\|X\| + 2\|Y\| | \|X\| + \|Y\| | \|X\| + \|Y\| |
+| X - Y - L' - L<sub>X</sub> - L<sub>Y</sub> - R' | = reconfiguration 7 | | total = | 2\|X\| + 2\|Y\| |
+
+- requires |L| >= |X| + |Y|
+- same steps as C3, with one call eliminated due to |Z| == 0
+- fewer moves than Method C1 if:
+	- 2|X| + 2|Y| < |L| + |X| + |Y|
+	- |X| + |Y| < |L|
+	- |L| > |X| + |Y|
+- fewer moves than Method C2 if:
+	- 2|X| + 2|Y| < 2|L| + |Y|
+	- 3|X| + |Y| < 2|L|
+	- 1.5|X| + |Y| < |L|
+	- |L| > 1.5|X| + |Y|
 
 Algorithm D:
 
@@ -377,12 +408,13 @@ else:
 	find Y in M where Y[i] < R'[0]
 	if |Y| == |M|:
 		find Z in L where Z[i] < R'[0]
-		if |Z| == |L|:
-			if |X| < |Z|:
+		if |Z| == 0:
+			if |L| < |X|:
 				Method D2
-			else:
+			elif |L| < |X| + |Y|:
 				Method D1
-			merge completed
+			else:
+				Method D3
 		else:
 			if |L| < |X|:
 				Method C2
@@ -470,12 +502,13 @@ loop:
 				find Y in M where Y[i] < R'[0]
 				if |Y| == |M|:
 					find Z in L where Z[i] < R'[0]
-					if |Z| == |L|:
-						if |X| < |Z|:
+					if |Z| == 0:
+						if |L| < |X|:
 							Method D2
-						else:
+						elif |L| < |X| + |Y|:
 							Method D1
-						merge completed
+						else:
+							Method D3
 					else:
 						if |L| < |X|:
 							Method C2
@@ -492,11 +525,9 @@ loop:
 						Method A1
 ```
 
-Special cases for |M| == 0.
+Special case for |M| == 0:
 
 If |X| == |R| (L<sub>0</sub> > R<sub>i</sub> for all i), then we simply need to reconfigure L - R to R - L as a final step to fully merged sequences.
-
-If |Z| == |L| (R'<sub>0</sub> > L<sub>i</sub> for all i), then we simply need to reconfigure Z - X to X - Z as a final step to fully merged sequences.
 
 Algorithm F:
 
@@ -508,10 +539,7 @@ loop:
 		merge completed
 	else:
 		find Z in L where Z[i] < R'[0]
-		if |Z| == |L|:
-			rotate(Z, X)
-			merge completed
-		else if |L| < 2|X| + |Z|:
+		if |L| < 2|X| + |Z|:
 			Method E1
 		else:
 			Method E2
@@ -527,12 +555,13 @@ loop:
 					find Y in M where Y[i] < R'[0]
 					if |Y| == |M|:
 						find Z in L where Z[i] < R'[0]
-						if |Z| == |L|:
-							if |X| < |Z|:
+						if |Z| == 0:
+							if |L| < |X|:
 								Method D2
-							else:
+							elif |L| < |X| + |Y|:
 								Method D1
-							merge completed
+							else:
+								Method D3
 						else:
 							if |L| < |X|:
 								Method C2
@@ -570,10 +599,7 @@ loop:
 		merge completed
 	else:
 		find Z in L where Z[i] < R'[0]
-		if |Z| == |L|:
-			rotate(Z, X)
-			merge completed
-		else if |L| < 2|X| + |Z|:
+		if |L| < 2|X| + |Z|:
 			Method E1
 			find X in R where X[i] < L[0]
 		else:
@@ -592,9 +618,14 @@ loop:
 					find Y in M where Y[i] < R'[0]
 					if |Y| == |M|:
 						find Z in L where Z[i] < R'[0]
-						if |Z| == |L|:
-							Method D2
-							merge completed
+						if |Z| == 0:
+							if |L| < |X| + |Y|:
+								Method D1
+								# Method D1 eliminates M
+								find X in R where X[i] < L[0]
+								break
+							else:
+								Method D3
 						else:
 							if |L| < 2|X| + 2|Y| + |Z|
 								Method C1
