@@ -309,65 +309,35 @@ fn merge<T, F>(s: &mut [T], split: usize, compare: &F, leftright: Ordering, righ
                     // |Y| == |M|:
                     // find Z in L where Z[i] < R'[0]
                     let zlen = insertion_point(&s[r0 + xlen], &s[l0 .. m0 - 1], compare, rightleft);
-                    // Methods C1, C3, D1, and D3 all start with a rotate of Y - X
+                    // Methods C1 and C3 both start with a rotate of Y - X
                     rotate(&mut s[m0 .. r0 + xlen], xlen);
-                    if zlen == 0 {
-                        // |Z| == 0:
-                        if m0 - l0 < xlen + ylen {
-                            // |L| < |X| + |Y|:
-                            // Method D1
-                            // rotate Y - X to X - Y
-                            // rotate LX - LY - L' - X - Y to X - Y - LX - LY - L'
-                            rotate(&mut s[l0 .. r0 + xlen], xlen + ylen);
-                            l0 += xlen + ylen;
-                            r0 += xlen;
-                            m0 = r0;
-                            // find X in R where X[i] < L[0]
-                            if m0 - l0 == 1 || r1 - r0 == 1 {
-                                // since r_0 is smallest value, if |R| = 1, we just need to swap L and R
-                                // since l_max is largest value, if |L| = 1, we just need to swap L and R
-                                rotate(&mut s[l0 .. r1], r1 - r0);
-                                return;
-                            }
-                            debug_assert!(r0 + 1 < r1);
-                            xlen = insertion_point(&s[l0], &s[r0 + 1 .. r1], compare, leftright) + 1;
-                            break
-                        }
-                        // Method D3
+                    if m0 - l0 < 2 * xlen + 2 * ylen + zlen {
+                        // Method C1
                         // rotate Y - X to X - Y
-                        // swap LX - LY with X - Y
-                        swap_ends(&mut s[l0 .. r0 + xlen], xlen + ylen);
-                        l0 += xlen + ylen;
-                        r0 += xlen;
-                    } else {
-                        if m0 - l0 < 2 * xlen + 2 * ylen + zlen {
-                            // Method C1
-                            // rotate Y - X to X - Y
-                            // rotate Z - LX - LY - L' - X - Y to X - Y - Z - LX - LY - L'
-                            rotate(&mut s[l0 .. r0 + xlen], xlen + ylen);
-                            l0 += xlen + ylen + zlen;
-                            r0 += xlen;
-                            m0 = r0;
-                            if m0 - l0 == 1 || r1 - r0 == 1 {
-                                // since r_0 is smallest value, if |R| = 1, we just need to swap L and R
-                                // since l_max is largest value, if |L| = 1, we just need to swap L and R
-                                rotate(&mut s[l0 .. r1], r1 - r0);
-                                return;
-                            }
-                            // find X in R where X[i] < L[0]
-                            debug_assert!(r0 + 1 < r1);
-                            xlen = insertion_point(&s[l0], &s[r0 + 1 .. r1], compare, leftright) + 1;
-                            break
-                        }
-                        // Method C3
-                        // rotate Y - X to X - Y
-                        // rotate Z - LX - LY to LX - LY - Z
-                        rotate(&mut s[l0 .. l0 + zlen + xlen + ylen], xlen + ylen);
-                        // swap LX - LY with X - Y
-                        swap_ends(&mut s[l0 .. r0 + xlen], xlen + ylen);
+                        // rotate Z - LX - LY - L' - X - Y to X - Y - Z - LX - LY - L'
+                        rotate(&mut s[l0 .. r0 + xlen], xlen + ylen);
                         l0 += xlen + ylen + zlen;
                         r0 += xlen;
+                        m0 = r0;
+                        if m0 - l0 == 1 || r1 - r0 == 1 {
+                            // since r_0 is smallest value, if |R| = 1, we just need to swap L and R
+                            // since l_max is largest value, if |L| = 1, we just need to swap L and R
+                            rotate(&mut s[l0 .. r1], r1 - r0);
+                            return;
+                        }
+                        // find X in R where X[i] < L[0]
+                        debug_assert!(r0 + 1 < r1);
+                        xlen = insertion_point(&s[l0], &s[r0 + 1 .. r1], compare, leftright) + 1;
+                        break
                     }
+                    // Method C3
+                    // rotate Y - X to X - Y
+                    // rotate Z - LX - LY to LX - LY - Z
+                    rotate(&mut s[l0 .. l0 + zlen + xlen + ylen], xlen + ylen);
+                    // swap LX - LY with X - Y
+                    swap_ends(&mut s[l0 .. r0 + xlen], xlen + ylen);
+                    l0 += xlen + ylen + zlen;
+                    r0 += xlen;
                 } else {
                     if m0 - l0 < r0 - m0 + 2 * xlen + ylen {
                         // |L| < |M| + 2|X| + |Y|:

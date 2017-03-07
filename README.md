@@ -641,3 +641,6 @@ loop:
 							Method A1
 					find X in R where X[i] < M[0]
 ```
+
+Since the Method D special case for |Z| == 0 is effectively covered by Method C, we can remove this case.
+Tests how the effect on performance is minor, but removal makes the algorithm simpler.
