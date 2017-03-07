@@ -122,7 +122,6 @@ fn add_modulo<T>(a: T, b: T, n: T) -> T
     }
 }
 
-
 fn rotate<T>(s: &mut [T], k: usize) {
     // Rotate the last k elements to the front of the slice.
     // given a slice of 0..n, move n-k..n to front and 0..n-k to end
@@ -130,21 +129,33 @@ fn rotate<T>(s: &mut [T], k: usize) {
     // for i = k..n, subtract size of first section: new position = (i - n + k) % n = (i + k) % n
     // so all elements need to have the same move applied
     // There are gcd(k, n-k) cycles
-    // TODO - possibly there is a speed-up by running the for loop inside the while. This will
-    // access data more linearly, which may improve CPU caching
-    // TODO - we can use unchecked gets to possibly improve performance, since indexes are
-    // constrained by modulo
     let n = s.len();
     if k == 0 || k == n {
         return
     }
-    debug_assert!(n > k);
-    let c = k.gcd(n - k);
-    for i in 0 .. c {
-        let mut j = add_modulo(i, k, n);
-        while j != i {
-            s.swap(i, j);
+    debug_assert!(k < n);
+    let blksize = k.gcd(n - k);
+    if blksize < 8 {
+        reverse(s);
+        reverse(&mut s[0 .. k]);
+        reverse(&mut s[k .. n]);
+    } else {
+        let mut j = k;
+        for _ in 0 .. n / blksize - 1 {
+            swap_ends(&mut s[0 .. j + blksize], blksize);
             j = add_modulo(j, k, n);
+        }
+    }
+}
+
+fn reverse<T>(s: &mut [T]) {
+    let n = s.len();
+    for i in 0 .. n / 2 {
+        // s.swap(i, n - i - 1);
+        unsafe {
+            let pa: *mut T = s.get_unchecked_mut(i);
+            let pb: *mut T = s.get_unchecked_mut(n - i - 1);
+            std::ptr::swap(pa, pb);
         }
     }
 }
