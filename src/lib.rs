@@ -184,12 +184,15 @@ fn merge<T, F>(s: &mut [T], split: usize, compare: &F, leftright: Ordering, righ
     //     rotate(&mut s[l0 .. r0 + pos], pos);
     //     return;
     // }
-    if rlen == 1 {
-        // |R| = 1: Just insert it into L
-        let pos = insertion_point(&s[r0], &s[l0 .. m0], compare, rightleft);
-        rotate(&mut s[l0 + pos .. r1], 1);
-        return;
-    }
+    // Removing this code requires one additional compare below when |R| == 1 and |L| > 1.  However,
+    // it significantly speeds up the ascending runs case.  For mergesort, most of the time when
+    // |R| == 1, |L| will also == 1 and we don't pay the cost of the extra compare.
+    // if rlen == 1 {
+    //     // |R| = 1: Just insert it into L
+    //     let pos = insertion_point(&s[r0], &s[l0 .. m0], compare, rightleft);
+    //     rotate(&mut s[l0 + pos .. r1], 1);
+    //     return;
+    // }
 
     // R may contain values that are higher than l_max.  These values are already in their final
     // position, so we can move them from R to S1.
@@ -590,7 +593,7 @@ mod tests {
         super::merge(
             &mut s, leftlen, &|&a, &b|{count.set(count.get() + 1); a.cmp(&b)}, Ordering::Less, Ordering::Greater
         );
-        assert_eq!(count.get(), 4);
+        assert_eq!(count.get(), 5);
         for (i, elem) in s.iter().enumerate() {
             assert_eq!(*elem, i);
         }
