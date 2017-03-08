@@ -177,22 +177,6 @@ fn merge<T, F>(s: &mut [T], split: usize, compare: &F, leftright: Ordering, righ
     if llen == 0 || rlen == 0 {
         return;
     }
-    // When llen == 1 the code below performs the same number of comparisons and moves
-    // if llen == 1 {
-    //     // |L| = 1: Just insert it into R
-    //     let pos = insertion_point(&s[l0], &s[r0 .. r1], compare, leftright);
-    //     rotate(&mut s[l0 .. r0 + pos], pos);
-    //     return;
-    // }
-    // Removing this code requires one additional compare below when |R| == 1 and |L| > 1.  However,
-    // it significantly speeds up the ascending runs case.  For mergesort, most of the time when
-    // |R| == 1, |L| will also == 1 and we don't pay the cost of the extra compare.
-    // if rlen == 1 {
-    //     // |R| = 1: Just insert it into L
-    //     let pos = insertion_point(&s[r0], &s[l0 .. m0], compare, rightleft);
-    //     rotate(&mut s[l0 + pos .. r1], 1);
-    //     return;
-    // }
 
     // R may contain values that are higher than l_max.  These values are already in their final
     // position, so we can move them from R to S1.
