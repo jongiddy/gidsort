@@ -136,26 +136,14 @@ fn rotate<T>(s: &mut [T], k: usize) {
     debug_assert!(k < n);
     let blksize = k.gcd(n - k);
     if blksize < 8 {
-        reverse(s);
-        reverse(&mut s[0 .. k]);
-        reverse(&mut s[k .. n]);
+        s.reverse();
+        s[0 .. k].reverse();
+        s[k .. n].reverse();
     } else {
         let mut j = k;
         for _ in 0 .. n / blksize - 1 {
             swap_ends(&mut s[0 .. j + blksize], blksize);
             j = add_modulo(j, k, n);
-        }
-    }
-}
-
-fn reverse<T>(s: &mut [T]) {
-    let n = s.len();
-    for i in 0 .. n / 2 {
-        // s.swap(i, n - i - 1);
-        unsafe {
-            let pa: *mut T = s.get_unchecked_mut(i);
-            let pb: *mut T = s.get_unchecked_mut(n - i - 1);
-            std::ptr::swap(pa, pb);
         }
     }
 }
