@@ -125,25 +125,48 @@ fn add_modulo<T>(a: T, b: T, n: T) -> T
 fn rotate<T>(s: &mut [T], k: usize) {
     // Rotate the last k elements to the front of the slice.
     // given a slice of 0..n, move n-k..n to front and 0..n-k to end
-    // for i = 0..k, add size of second section: new position = (i + k) % n
-    // for i = k..n, subtract size of first section: new position = (i - n + k) % n = (i + k) % n
-    // so all elements need to have the same move applied
-    // There are gcd(k, n-k) cycles
     let n = s.len();
     if k == 0 || k == n {
         return
     }
     debug_assert!(k < n);
-    let blksize = k.gcd(n - k);
-    if blksize < 8 {
-        s.reverse();
-        s[0 .. k].reverse();
-        s[k .. n].reverse();
+    // If there's just one element to swap at one end, then we can pull it out into a temporary,
+    // and shift everything else up/down 1 position.
+    if k == 1 {
+        unsafe {
+            let l = s.as_mut_ptr();
+            let r = s.as_mut_ptr().offset((n - 1) as isize);
+            let t = std::ptr::read(r);
+            std::ptr::copy(l, l.offset(1), n - 1);
+            std::ptr::write(l, t);
+        }
+    } else if k == n - 1 {
+        unsafe {
+            let l = s.as_mut_ptr();
+            let r = s.as_mut_ptr().offset(1 as isize);
+            let t = std::ptr::read(l);
+            std::ptr::copy(r, l, n - 1);
+            std::ptr::write(l.offset((n - 1) as isize), t);
+        }
     } else {
-        let mut j = k;
-        for _ in 0 .. n / blksize - 1 {
-            swap_ends(&mut s[0 .. j + blksize], blksize);
-            j = add_modulo(j, k, n);
+        // for i = 0..k, add size of second section: new position = (i + k) % n
+        // for i = k..n, subtract size of first section: new position = (i - n + k) % n = (i + k) % n
+        // so all elements need to have the same move applied
+        // There are gcd(k, n-k) cycles
+        let blksize = k.gcd(n - k);
+        if blksize < 8 {
+            // If GCD is low, then we tend to stride through the slice moving a few elements at a
+            // time.  In this case, the classic reverse everything twice algorithm performs faster.
+            s.reverse();
+            s[0 .. k].reverse();
+            s[k .. n].reverse();
+        } else {
+            // Otherwise, we move each block up by k positions, using the first block as working space.
+            let mut j = k;
+            for _ in 0 .. n / blksize - 1 {
+                swap_ends(&mut s[0 .. j + blksize], blksize);
+                j = add_modulo(j, k, n);
+            }
         }
     }
 }
