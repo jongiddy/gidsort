@@ -388,7 +388,33 @@ pub fn sort_by<T, F>(s: &mut [T], compare: &F)
         F: Fn(&T, &T) -> Ordering
 {
     let length = s.len();
-    let mut blk = 1;
+    // Handcrafted sort for chunks of 4
+    for chunk in s.chunks_mut(4) {
+        let n = chunk.len();
+        if n == 1 { break }
+        if compare(&chunk[0], &chunk[1]) == Ordering::Greater {
+            chunk.swap(0, 1);
+        }
+        if n == 2 { break }
+        if compare(&chunk[1], &chunk[2]) == Ordering::Greater {
+            if compare(&chunk[0], &chunk[2]) == Ordering::Greater {
+                rotate(&mut chunk[0 .. 3], 1);
+            } else {
+                chunk.swap(1, 2);
+            }
+        }
+        if n == 3 { break }
+        if compare(&chunk[1], &chunk[3]) == Ordering::Greater {
+            if compare(&chunk[0], &chunk[3]) == Ordering::Greater {
+                rotate(chunk, 1);
+            } else {
+                rotate(&mut chunk[1 .. 4], 1);
+            }
+        } else if compare(&chunk[2], &chunk[3]) == Ordering::Greater {
+            chunk.swap(2, 3);
+        }
+    }
+    let mut blk = 4;  // size of blocks already sorted
     while blk < length {
         let mut start = 0;
         let mut pivot = blk;
@@ -482,7 +508,10 @@ mod tests {
         for (i, elem) in s.iter().enumerate() {
             assert_eq!(*elem, i);
         }
-        assert_eq!(count.get(), s.len() - 1);
+        // Using the merge algorithm only gives the minimum number of comparisons (15).  However,
+        // the handcrafted sort of 4 uses one additional comparison for each block of 4.  This
+        // benefits random data more, and sort of ordered data is still faster than anything else.
+        assert_eq!(count.get(), 19); // minimum is 15
     }
 
     #[test]
