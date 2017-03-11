@@ -369,7 +369,7 @@ fn merge<T, F>(s: &mut [T], split: usize, compare: &F, leftright: Ordering, righ
                     } else {
                         // Method A1
                         // rotate Y - M' - X to M' - X - Y
-                        rotate(&mut s[m0 .. r0 + xlen], r0 - (m0 + ylen) + xlen);
+                        rotate(&mut s[m0 .. r0 + xlen], mlen!() - ylen + xlen);
                         // swap LX - LY with X - Y
                         swap_ends(&mut s[l0 .. r0 + xlen], xlen + ylen);
                         l0 += xlen + ylen;
