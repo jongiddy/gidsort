@@ -9,6 +9,13 @@ use gcd::Gcd;
 #[macro_use]
 extern crate quickcheck;
 
+
+// Tuning parameters:
+
+// The maximum GCD for which reverse is used to rotate. Above this value, block swapping is used.
+macro_rules! rotate_reverse_max {() => (8)}
+
+
 #[inline]
 fn split_biased(n: usize) -> usize {
     // Return a split point that ensures that the RHS is a balanced binary tree.  A balanced binary
@@ -154,7 +161,7 @@ fn rotate<T>(s: &mut [T], k: usize) {
         // so all elements need to have the same move applied
         // There are gcd(k, n-k) cycles
         let blksize = k.gcd(n - k);
-        if blksize < 8 {
+        if blksize < rotate_reverse_max!() {
             // If GCD is low, then we tend to stride through the slice moving a few elements at a
             // time.  In this case, the classic reverse everything twice algorithm performs faster.
             s.reverse();
