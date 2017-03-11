@@ -383,16 +383,15 @@ fn merge<T, F>(s: &mut [T], split: usize, compare: &F, leftright: Ordering, righ
     }
 }
 
-pub fn sort_by<T, F>(s: &mut [T], compare: &F)
+pub fn sort4<T, F>(s: &mut [T], compare: &F)
     where
         F: Fn(&T, &T) -> Ordering
 {
+    // Handcrafted sort for chunks of 4
     let length = s.len();
     let over4 = length % 4;
     let length4 = length - over4;
-    // Handcrafted sort for chunks of 4
     for chunk in s[0 .. length4].chunks_mut(4) {
-        let n = chunk.len();
         if compare(&chunk[0], &chunk[1]) == Ordering::Greater {
             chunk.swap(0, 1);
         }
@@ -413,11 +412,11 @@ pub fn sort_by<T, F>(s: &mut [T], compare: &F)
             chunk.swap(2, 3);
         }
     }
-    if over4 > 1 {
+    if over4 >= 2 {
         if compare(&s[length4], &s[length4 + 1]) == Ordering::Greater {
             s.swap(length4, length4 + 1);
         }
-        if over4 > 2 {
+        if over4 == 3 {
             if compare(&s[length4 + 1], &s[length4 + 2]) == Ordering::Greater {
                 if compare(&s[length4], &s[length4 + 2]) == Ordering::Greater {
                     rotate(&mut s[length4 .. length4 + 3], 1);
@@ -427,6 +426,14 @@ pub fn sort_by<T, F>(s: &mut [T], compare: &F)
             }
         }
     }
+}
+
+pub fn sort_by<T, F>(s: &mut [T], compare: &F)
+    where
+        F: Fn(&T, &T) -> Ordering
+{
+    let length = s.len();
+    sort4(s, compare);
     let mut blk = 4;  // size of blocks already sorted
     while blk < length {
         let mut start = 0;
