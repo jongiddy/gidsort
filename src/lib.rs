@@ -284,6 +284,7 @@ fn merge<T, F>(s: &mut [T], split: usize, compare: &F, leftright: Ordering, righ
         }
         else {
             // Method E2
+            debug_assert!(xlen <= llen!());
             // swap L[X] with X
             swap_ends(&mut s[l0 + zlen .. r0 + xlen], xlen);
             // rotate Z - X to X - Z
@@ -348,6 +349,7 @@ fn merge<T, F>(s: &mut [T], split: usize, compare: &F, leftright: Ordering, righ
                         break
                     }
                     // Method C3
+                    debug_assert!(xlen + ylen <= llen!());
                     // rotate Y - X to X - Y
                     // rotate Z - LX - LY to LX - LY - Z
                     rotate(&mut s[l0 .. l0 + zlen + xlen + ylen], xlen + ylen);
@@ -359,6 +361,7 @@ fn merge<T, F>(s: &mut [T], split: usize, compare: &F, leftright: Ordering, righ
                     if llen!() < mlen!() + 2 * xlen + ylen {
                         // |L| < |M| + 2|X| + |Y|:
                         // Method A2
+                        debug_assert!(xlen <= llen!());
                         // swap LX with X
                         swap_ends(&mut s[l0 .. r0 + xlen], xlen);
                         // rotate LY - L' - Y to Y - LY - L'
@@ -368,6 +371,7 @@ fn merge<T, F>(s: &mut [T], split: usize, compare: &F, leftright: Ordering, righ
                         r0 += xlen;
                     } else {
                         // Method A1
+                        debug_assert!(xlen + ylen <= llen!());
                         // rotate Y - M' - X to M' - X - Y
                         rotate(&mut s[m0 .. r0 + xlen], mlen!() - ylen + xlen);
                         // swap LX - LY with X - Y
