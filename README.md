@@ -299,7 +299,7 @@ Method C3:
 | L<sub>X</sub> - L<sub>Y</sub> - Z - L' - X - Y - R' | swap L<sub>X</sub> - L<sub>Y</sub> with X - Y | 2\|X\| + 2\|Y\| | \|X\| + \|Y\| | \|X\| + \|Y\| |
 | X - Y - Z - L' - L<sub>X</sub> - L<sub>Y</sub> - R' | = reconfiguration 7 | | total = | 3\|X\| + 3\|Y\| |
 
-- requires |L| >= |X| + |Y|
+- requires |L| >= |X| + |Y| + |Z|
 - fewer moves than Method C1 if:
 	- 3|X| + 3|Y| < |L| + |X| + |Y| - |Z|
 	- 2|X| + 2|Y| < |L| - |Z|
@@ -477,7 +477,7 @@ Method E2:
 | Z - X - L' - L<sub>X</sub> - R' | rotate Z - X to X - Z | \|Z\| + \|X\| | \|Z\| + \|X\| | 0 |
 | X - Z - L' - L<sub>X</sub> - R' | = reconfiguration 9 | | total = | 2\|X\| |
 
-- works when |L| >= |X|
+- works when |L| >= |X| + |Z|
 - fewer moves than Method E2 when 2|X| < |L| - |Z|
 
 Algorithm E:
@@ -644,3 +644,50 @@ loop:
 
 Since the Method D special case for |Z| == 0 is effectively covered by Method C, we can remove this case.
 Tests how the effect on performance is minor, but removal makes the algorithm simpler.
+
+Swaps are much cheaper than rotations, so rather than use the costs calculated above, the algorithm uses the constraints on when particular methods using swaps are valid.
+
+The current algorithm as actually implemented is:
+
+```
+find X in R where X[i] < L[0]
+loop:
+	assert |M| == 0
+	if |X| == |R|:
+		rotate(L, R)
+		merge completed
+	else:
+		find Z in L where Z[i] < R'[0]
+		if |L| < |X| + |Z|:
+			Method E1
+			find X in R where X[i] < L[0]
+		else:
+			Method E2
+			find X in R where X[i] < M[0]
+			loop:
+				assert |M| > 0:
+				if |L| < |X|:
+					rotate(L, M)
+					# merge M-L to L, and X still valid
+					break
+				else if |X| == |R|:
+					Method B2
+					merge completed
+				else:
+					find Y in M where Y[i] < R'[0]
+					if |Y| == |M|:
+						find Z in L where Z[i] < R'[0]
+						if |L| < |X| + |Y| + |Z|
+							Method C1
+							# Method C1 eliminates M
+							find X in R where X[i] < L[0]
+							break
+						else:
+							Method C3
+					else:
+						if |L| < |M| + |X|:
+							Method A2
+						else:
+							Method A1
+					find X in R where X[i] < M[0]
+```

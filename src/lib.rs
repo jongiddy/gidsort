@@ -302,7 +302,7 @@ fn merge<T, F>(s: &mut [T], split: usize, compare: &F, leftright: Ordering, righ
         // - this search relies on invariant |L| > 1, tested in assert
         debug_assert!(l0 + 1 <= m0 - 1);
         let zlen = insertion_point(&s[r0 + xlen], &s[l0 + 1 .. m0 - 1], compare, rightleft) + 1;
-        if llen!() < 2 * xlen + zlen {
+        if llen!() < xlen + zlen {
             // |L| < 2|X| + |Z|:
             // Method E1
             // rotate Z - LX - L' - X to X - Z - LX - L'
@@ -321,7 +321,7 @@ fn merge<T, F>(s: &mut [T], split: usize, compare: &F, leftright: Ordering, righ
         }
         else {
             // Method E2
-            debug_assert!(xlen <= llen!());
+            debug_assert!(xlen + zlen <= llen!());
             // swap L[X] with X
             swap_ends(&mut s[l0 + zlen .. r0 + xlen], xlen);
             // rotate Z - X to X - Z
@@ -366,7 +366,7 @@ fn merge<T, F>(s: &mut [T], split: usize, compare: &F, leftright: Ordering, righ
                     let zlen = insertion_point(&s[r0 + xlen], &s[l0 .. m0 - 1], compare, rightleft);
                     // Methods C1 and C3 both start with a rotate of Y - X
                     rotate(&mut s[m0 .. r0 + xlen], xlen);
-                    if llen!() < 2 * xlen + 2 * ylen + zlen {
+                    if llen!() < xlen + ylen + zlen {
                         // Method C1
                         // rotate Y - X to X - Y
                         // rotate Z - LX - LY - L' - X - Y to X - Y - Z - LX - LY - L'
@@ -395,8 +395,10 @@ fn merge<T, F>(s: &mut [T], split: usize, compare: &F, leftright: Ordering, righ
                     l0 += xlen + ylen + zlen;
                     r0 += xlen;
                 } else {
-                    if llen!() < mlen!() + 2 * xlen + ylen {
-                        // |L| < |M| + 2|X| + |Y|:
+                    if llen!() < mlen!() + xlen {
+                        // this method works for |L| < |X| + |Y|. However, |M| is a major
+                        // factor in the amount of work done, so we use it instead of |Y|.
+                        // Since |Y| < |M|, we always take the work that A1 can't handle.
                         // Method A2
                         debug_assert!(xlen <= llen!());
                         // swap LX with X
