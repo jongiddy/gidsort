@@ -66,8 +66,8 @@ fn insertion_point<T, F>(value: &T, buffer: &[T], compare: &F, when_equal: Order
     let mut lo = 0;       // lowest candidate
     let mut hi = length;  // highest candidate
     let mut p2 = 1;
-    while p2 <= length {
-        let trial = p2 - 1;
+    while p2 < length {
+        let trial = p2;
         let mut leg = compare(value, &buffer[trial]);
         if leg == Ordering::Equal {
             leg = when_equal;
@@ -78,7 +78,7 @@ fn insertion_point<T, F>(value: &T, buffer: &[T], compare: &F, when_equal: Order
                 break;
             },
             Ordering::Greater => {
-                lo = p2;
+                lo = p2 + 1;
                 p2 *= 2;
             },
             Ordering::Equal => {
