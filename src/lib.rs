@@ -1,3 +1,5 @@
+#![feature(ordering_chaining)]
+
 extern crate gcd;
 
 use std::cmp::min;
@@ -68,10 +70,7 @@ fn insertion_point<T, F>(value: &T, buffer: &[T], compare: &F, when_equal: Order
     let mut p2 = 1;
     while p2 < length {
         let trial = p2;
-        let mut leg = compare(value, &buffer[trial]);
-        if leg == Ordering::Equal {
-            leg = when_equal;
-        };
+        let leg = compare(value, &buffer[trial]).then(when_equal);
         match leg {
             Ordering::Less => {
                 hi = trial;
@@ -89,10 +88,7 @@ fn insertion_point<T, F>(value: &T, buffer: &[T], compare: &F, when_equal: Order
     while hi > lo {
         let trial = lo + (hi - lo) / 2;
         debug_assert!(trial < length);
-        let mut leg = compare(value, &buffer[trial]);
-        if leg == Ordering::Equal {
-            leg = when_equal;
-        };
+        let leg = compare(value, &buffer[trial]).then(when_equal);
         match leg {
             Ordering::Less => {
                 hi = trial;
