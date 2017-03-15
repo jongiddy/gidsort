@@ -54,8 +54,11 @@ fn insertion_point<T, F>(
     //
     // The offset value must be a power of two and the initial value must be one less than a power
     // of two, to ensure that the next stage gets a balanced binary tree.
+    //
+    // Setting initial == length will skip the gallop and go straight to binary search.
+    // Setting offset == length will test the initial value and then go to binary search.
     debug_assert!(initial >= length || (initial + 1).is_power_of_two());
-    debug_assert!(offset.is_power_of_two());
+    debug_assert!(offset >= length || offset.is_power_of_two());
     let mut p2 = offset;
     while p2 - offset + initial < length {
         let trial = p2 - offset + initial;
@@ -247,19 +250,23 @@ fn merge<T, F>(s: &mut [T], split: usize, compare: &F, leftright: Ordering, righ
 
     // R may contain values that are higher than l_max.  These values are already in their final
     // position, so we can move them from R to S1.
-    let pos = insertion_point(&s[m0 - 1], &s[r0 .. r1], compare, leftright, 0, 1);
+    let pos = insertion_point(&s[m0 - 1], &s[r0 .. r1], compare, leftright, 0, r1);
     if pos == 0 {
         // l_max < r_0 -> L-R is already sorted
         //
         // Although this code is shrinking the size of the sequence and setting up a useful
         // invariant, it also provides a third behaviour which is useful when this function is
-        // called as part of a mergesort. It uses only one comparison to check the value against
-        // the first point of the sequence.
+        // called as part of a mergesort. By passing (initial, offset) = (0, length) it uses the
+        // first comparison to check the value against the first point of the sequence.
         //
         // This means already ordered sequences are merged with one comparison, and an entire
         // mergesort of already ordered data will take the minimum possible (n-1) comparisons.
         // This is useful because much real data is close to already sorted, so optimising this
         // case is valuable.
+        //
+        // Since mergesort typically passes buffers of size 2^n, this means the binary search occurs
+        // over the remaining 2^n-1 values (i.e. is completely balanced).  Hence, this initial test
+        // has no effect on the worst case of log2 n.
         return;
     }
     r1 = r0 + pos;
@@ -787,10 +794,10 @@ mod tests {
         let mut profile = Vec::new();
         for v in 0 .. s.len() + 1 {
             let count = Cell::new(0);
-            assert_eq!(super::insertion_point(&v, &s, &|&a, &b|{count.set(count.get() + 1); a.cmp(&b)}, Ordering::Less, 0, 1), v);
+            assert_eq!(super::insertion_point(&v, &s, &|&a, &b|{count.set(count.get() + 1); a.cmp(&b)}, Ordering::Less, 0, s.len()), v);
             profile.push(count.get());
         }
-        assert_eq!(profile, vec![1, 2, 4, 4, 6, 6, 6, 6, 8, 8, 8, 8, 8, 8, 8, 8, 5])
+        assert_eq!(profile, vec![1, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5])
     }
 
     #[test]
