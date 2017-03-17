@@ -180,10 +180,22 @@ fn rotate<T>(s: &mut [T], k: usize) {
     if llen == 0 || rlen == 0 {
         return
     }
-    // Rotate two sections by swapping the ends repeatedly
-    while llen > 1 && rlen > 1 {
+    // Rotate two sections by swapping the ends repeatedly.  If there's just one element to swap at
+    // one end, pull it out into a temporary, and shift everything else up/down 1 position.  If
+    // the sides are unbalanced, use one of the methods from rotate_gcd.
+    loop {
         match llen.cmp(&rlen) {
             Ordering::Less => {
+                if llen == 1 {
+                    unsafe {
+                        let l = s.as_mut_ptr().offset(left as isize);
+                        let r = s.as_mut_ptr().offset((right - 1) as isize);
+                        let t = std::ptr::read(l);
+                        std::ptr::copy(l.offset(1), l, rlen);
+                        std::ptr::write(r, t);
+                    }
+                    return
+                }
                 if rlen / 2 > llen {
                     rotate_gcd(&mut s[left .. right], rlen);
                     return
@@ -193,6 +205,16 @@ fn rotate<T>(s: &mut [T], k: usize) {
                 rlen -= llen;
             },
             Ordering::Greater => {
+                if rlen == 1 {
+                    unsafe {
+                        let l = s.as_mut_ptr().offset(left as isize);
+                        let r = s.as_mut_ptr().offset((right - 1) as isize);
+                        let t = std::ptr::read(r);
+                        std::ptr::copy(l, l.offset(1), llen);
+                        std::ptr::write(l, t);
+                    }
+                    return
+                }
                 if llen / 2 > rlen {
                     rotate_gcd(&mut s[left .. right], rlen);
                     return
@@ -205,26 +227,6 @@ fn rotate<T>(s: &mut [T], k: usize) {
                 swap_ends(&mut s[left .. right], llen);
                 return
             }
-        }
-    }
-    // If there's just one element to swap at one end, then we can pull it out into a temporary,
-    // and shift everything else up/down 1 position.
-    if rlen == 1 {
-        unsafe {
-            let l = s.as_mut_ptr().offset(left as isize);
-            let r = s.as_mut_ptr().offset((right - 1) as isize);
-            let t = std::ptr::read(r);
-            std::ptr::copy(l, l.offset(1), llen);
-            std::ptr::write(l, t);
-        }
-    } else {
-        debug_assert!(llen == 1);
-        unsafe {
-            let l = s.as_mut_ptr().offset(left as isize);
-            let r = s.as_mut_ptr().offset((right - 1) as isize);
-            let t = std::ptr::read(l);
-            std::ptr::copy(l.offset(1), l, rlen);
-            std::ptr::write(r, t);
         }
     }
 }
