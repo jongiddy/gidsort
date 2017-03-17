@@ -45,6 +45,20 @@ fn gen_mostly_descending(len: usize) -> Vec<u64> {
     v
 }
 
+fn gen_short_runs(len: usize) -> Vec<u64> {
+    // swap odds and evens to create many short runs
+    // 7 2 1 4 3 6 5 0
+    let mut v = gen_ascending(len);
+    let last = v.len() - 1;
+    v.swap(0, last);
+    for i in 1 .. last {
+        if i % 2 == 0 {
+            v.swap(i - 1, i);
+        }
+    }
+    v
+}
+
 fn gen_big_random(len: usize) -> Vec<[u64; 16]> {
     let mut rng = thread_rng();
     rng.gen_iter().map(|x| [x; 16]).take(len).collect()
@@ -80,6 +94,7 @@ sort_bench!(medium_random_306035c21, gen_random, 100);
 sort_bench!(medium_ascending_306035c21, gen_ascending, 100);
 sort_bench!(medium_descending_306035c21, gen_descending, 100);
 
+sort_bench!(large_short_runs_306035c21, gen_short_runs, 10000);
 sort_bench!(large_random_306035c21, gen_random, 10000);
 sort_bench!(large_ascending_306035c21, gen_ascending, 10000);
 sort_bench!(large_descending_306035c21, gen_descending, 10000);
@@ -112,6 +127,7 @@ new_sort_bench!(medium_random_gidsort, gen_random, 100);
 new_sort_bench!(medium_ascending_gidsort, gen_ascending, 100);
 new_sort_bench!(medium_descending_gidsort, gen_descending, 100);
 
+new_sort_bench!(large_short_runs_gidsort, gen_short_runs, 10000);
 new_sort_bench!(large_random_gidsort, gen_random, 10000);
 new_sort_bench!(large_ascending_gidsort, gen_ascending, 10000);
 new_sort_bench!(large_descending_gidsort, gen_descending, 10000);
