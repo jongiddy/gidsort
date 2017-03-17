@@ -186,42 +186,74 @@ fn rotate<T>(s: &mut [T], k: usize) {
     loop {
         match llen.cmp(&rlen) {
             Ordering::Less => {
-                if llen == 1 {
-                    unsafe {
-                        let l = s.as_mut_ptr().offset(left as isize);
-                        let r = s.as_mut_ptr().offset((right - 1) as isize);
-                        let t = std::ptr::read(l);
-                        std::ptr::copy(l.offset(1), l, rlen);
-                        std::ptr::write(r, t);
+                match llen {
+                    1 => {
+                        unsafe {
+                            let l = s.as_mut_ptr().offset(left as isize);
+                            let r = s.as_mut_ptr().offset((right - 1) as isize);
+                            let t = std::ptr::read(l);
+                            std::ptr::copy(l.offset(1), l, rlen);
+                            std::ptr::write(r, t);
+                        }
+                        return
+                    },
+                    2 => {
+                        unsafe {
+                            let l = s.as_mut_ptr().offset(left as isize);
+                            let r = s.as_mut_ptr().offset((right - 1) as isize);
+                            let t = std::ptr::read(l);
+                            let u = std::ptr::read(l.offset(1));
+                            std::ptr::copy(l.offset(2), l, rlen);
+                            std::ptr::write(r.offset(-1), t);
+                            std::ptr::write(r, u);
+                        }
+                        return
+                    },
+                    _  if rlen / 2 > llen => {
+                        rotate_gcd(&mut s[left .. right], rlen);
+                        return
+                    },
+                    _ => {
+                        swap_ends(&mut s[left .. right], llen);
+                        right -= llen;
+                        rlen -= llen;
                     }
-                    return
                 }
-                if rlen / 2 > llen {
-                    rotate_gcd(&mut s[left .. right], rlen);
-                    return
-                }
-                swap_ends(&mut s[left .. right], llen);
-                right -= llen;
-                rlen -= llen;
             },
             Ordering::Greater => {
-                if rlen == 1 {
-                    unsafe {
-                        let l = s.as_mut_ptr().offset(left as isize);
-                        let r = s.as_mut_ptr().offset((right - 1) as isize);
-                        let t = std::ptr::read(r);
-                        std::ptr::copy(l, l.offset(1), llen);
-                        std::ptr::write(l, t);
+                match rlen {
+                    1 => {
+                        unsafe {
+                            let l = s.as_mut_ptr().offset(left as isize);
+                            let r = s.as_mut_ptr().offset((right - 1) as isize);
+                            let t = std::ptr::read(r);
+                            std::ptr::copy(l, l.offset(1), llen);
+                            std::ptr::write(l, t);
+                        }
+                        return
+                    },
+                    2 => {
+                        unsafe {
+                            let l = s.as_mut_ptr().offset(left as isize);
+                            let r = s.as_mut_ptr().offset((right - 1) as isize);
+                            let t = std::ptr::read(r.offset(-1));
+                            let u = std::ptr::read(r);
+                            std::ptr::copy(l, l.offset(2), llen);
+                            std::ptr::write(l, t);
+                            std::ptr::write(l.offset(1), u);
+                        }
+                        return
+                    },
+                    _ if llen / 2 > rlen => {
+                        rotate_gcd(&mut s[left .. right], rlen);
+                        return
+                    },
+                    _ => {
+                        swap_ends(&mut s[left .. right], rlen);
+                        left += rlen;
+                        llen -= rlen;
                     }
-                    return
                 }
-                if llen / 2 > rlen {
-                    rotate_gcd(&mut s[left .. right], rlen);
-                    return
-                }
-                swap_ends(&mut s[left .. right], rlen);
-                left += rlen;
-                llen -= rlen;
             },
             Ordering::Equal => {
                 swap_ends(&mut s[left .. right], llen);
