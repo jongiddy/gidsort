@@ -199,13 +199,14 @@ fn rotate<T>(s: &mut [T], k: usize) {
                     },
                     2 => {
                         unsafe {
+                            let mut tmp: [T; 2] = std::mem::uninitialized();
                             let l = s.as_mut_ptr().offset(left as isize);
-                            let r = s.as_mut_ptr().offset((right - 1) as isize);
-                            let t = std::ptr::read(l);
-                            let u = std::ptr::read(l.offset(1));
+                            let r = s.as_mut_ptr().offset((right - 2) as isize);
+                            let t = tmp.as_mut_ptr();
+                            std::ptr::copy_nonoverlapping(l, t, 2);
                             std::ptr::copy(l.offset(2), l, rlen);
-                            std::ptr::write(r.offset(-1), t);
-                            std::ptr::write(r, u);
+                            std::ptr::copy_nonoverlapping(t, r, 2);
+                            std::mem::forget(tmp);
                         }
                         return
                     },
@@ -234,13 +235,14 @@ fn rotate<T>(s: &mut [T], k: usize) {
                     },
                     2 => {
                         unsafe {
+                            let mut tmp: [T; 2] = std::mem::uninitialized();
                             let l = s.as_mut_ptr().offset(left as isize);
-                            let r = s.as_mut_ptr().offset((right - 1) as isize);
-                            let t = std::ptr::read(r.offset(-1));
-                            let u = std::ptr::read(r);
+                            let r = s.as_mut_ptr().offset((right - 2) as isize);
+                            let t = tmp.as_mut_ptr();
+                            std::ptr::copy_nonoverlapping(r, t, 2);
                             std::ptr::copy(l, l.offset(2), llen);
-                            std::ptr::write(l, t);
-                            std::ptr::write(l.offset(1), u);
+                            std::ptr::copy_nonoverlapping(t, l, 2);
+                            std::mem::forget(tmp);
                         }
                         return
                     },
