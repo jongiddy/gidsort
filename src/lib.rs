@@ -205,7 +205,6 @@ fn rotate<T>(s: &mut [T], rlen: usize) {
     let length = s.len();
     debug_assert!(rlen <= length);
     let llen = length - rlen;
-    let rlen = rlen;
     if llen == 0 || rlen == 0 {
         return
     }
