@@ -12,6 +12,10 @@ extern crate quickcheck;
 
 // Tuning parameters:
 
+// The algorithm may use this many bytes on the stack as a buffer.  Only one buffer of this size
+// exists on the stack at any time.
+const STACK_OBJECT_SIZE: usize = 1024;
+
 // The maximum GCD for which reverse is used to rotate. Above this value, block swapping is used.
 macro_rules! rotate_reverse_max {() => (8)}
 
@@ -169,13 +173,12 @@ fn rotate_gcd<T>(s: &mut [T], k: usize) {
     }
 }
 
-const MAX_ROTATE_SHIFT: usize = 16;
-
 fn rotate_left_shift<T>(s: &mut [T], llen: usize) {
+    debug_assert!(llen * std::mem::size_of::<T>() <= STACK_OBJECT_SIZE);
     let rlen = s.len() - llen;
     unsafe {
-        let mut tmp: [T; MAX_ROTATE_SHIFT] = std::mem::uninitialized();
-        let t = tmp.as_mut_ptr();
+        let mut tmp: [u8; STACK_OBJECT_SIZE] = std::mem::uninitialized();
+        let t = tmp.as_mut_ptr() as *mut T;
         let l = s.as_mut_ptr();
         let r = s.as_mut_ptr().offset(rlen as isize);
         std::ptr::copy_nonoverlapping(l, t, llen);
@@ -186,10 +189,11 @@ fn rotate_left_shift<T>(s: &mut [T], llen: usize) {
 }
 
 fn rotate_right_shift<T>(s: &mut [T], rlen: usize) {
+    debug_assert!(rlen * std::mem::size_of::<T>() <= STACK_OBJECT_SIZE);
     let llen = s.len() - rlen;
     unsafe {
-        let mut tmp: [T; MAX_ROTATE_SHIFT] = std::mem::uninitialized();
-        let t = tmp.as_mut_ptr();
+        let mut tmp: [u8; STACK_OBJECT_SIZE] = std::mem::uninitialized();
+        let t = tmp.as_mut_ptr() as *mut T;
         let l = s.as_mut_ptr();
         let r = s.as_mut_ptr().offset(llen as isize);
         std::ptr::copy_nonoverlapping(r, t, rlen);
@@ -202,6 +206,7 @@ fn rotate_right_shift<T>(s: &mut [T], rlen: usize) {
 fn rotate<T>(s: &mut [T], rlen: usize) {
     // Rotate the last rlen elements to the front of the slice.
     // given a slice of 0..n, move n-rlen..n to front and 0..n-rlen to end
+    let max_rotate_shift: usize = STACK_OBJECT_SIZE / std::mem::size_of::<T>();
     let length = s.len();
     debug_assert!(rlen <= length);
     let llen = length - rlen;
@@ -210,21 +215,15 @@ fn rotate<T>(s: &mut [T], rlen: usize) {
     }
     match llen.cmp(&rlen) {
         Ordering::Less => {
-            match llen {
-                1 ... MAX_ROTATE_SHIFT => {
-                    rotate_left_shift(s, llen);
-                    return
-                },
-                _ => {},
+            if llen <= max_rotate_shift {
+                rotate_left_shift(s, llen);
+                return
             }
         },
         Ordering::Greater => {
-            match rlen {
-                1 ... MAX_ROTATE_SHIFT => {
-                    rotate_right_shift(s, rlen);
-                    return
-                },
-                _ => {},
+            if rlen <= max_rotate_shift {
+                rotate_right_shift(s, rlen);
+                return
             }
         },
         Ordering::Equal => {
