@@ -14,7 +14,7 @@ extern crate quickcheck;
 
 // The algorithm may use this many bytes on the stack as a buffer.  Only one buffer of this size
 // exists on the stack at any time.
-const STACK_OBJECT_SIZE: usize = 1024;
+const STACK_OBJECT_SIZE: usize = 2048;
 
 // The maximum GCD for which reverse is used to rotate. Above this value, block swapping is used.
 macro_rules! rotate_reverse_max {() => (8)}
