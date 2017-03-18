@@ -169,6 +169,38 @@ fn rotate_gcd<T>(s: &mut [T], k: usize) {
     }
 }
 
+macro_rules! rotate_left_shift {
+    ($s:expr, $llen:expr) => {
+        let rlen = $s.len() - $llen;
+        unsafe {
+            let mut tmp: [T; $llen] = std::mem::uninitialized();
+            let t = tmp.as_mut_ptr();
+            let l = $s.as_mut_ptr();
+            let r = $s.as_mut_ptr().offset(rlen as isize);
+            std::ptr::copy_nonoverlapping(l, t, $llen);
+            std::ptr::copy(l.offset($llen), l, rlen);
+            std::ptr::copy_nonoverlapping(t, r, $llen);
+            std::mem::forget(tmp);
+        }
+    }
+}
+
+macro_rules! rotate_right_shift {
+    ($s:expr, $rlen:expr) => {
+        let llen = $s.len() - $rlen;
+        unsafe {
+            let mut tmp: [T; $rlen] = std::mem::uninitialized();
+            let t = tmp.as_mut_ptr();
+            let l = $s.as_mut_ptr();
+            let r = $s.as_mut_ptr().offset(llen as isize);
+            std::ptr::copy_nonoverlapping(r, t, $rlen);
+            std::ptr::copy(l, l.offset($rlen), llen);
+            std::ptr::copy_nonoverlapping(t, l, $rlen);
+            std::mem::forget(tmp);
+        }
+    }
+}
+
 fn rotate<T>(s: &mut [T], k: usize) {
     // Rotate the last k elements to the front of the slice.
     // given a slice of 0..n, move n-k..n to front and 0..n-k to end
@@ -188,26 +220,11 @@ fn rotate<T>(s: &mut [T], k: usize) {
             Ordering::Less => {
                 match llen {
                     1 => {
-                        unsafe {
-                            let l = s.as_mut_ptr().offset(left as isize);
-                            let r = s.as_mut_ptr().offset((right - 1) as isize);
-                            let t = std::ptr::read(l);
-                            std::ptr::copy(l.offset(1), l, rlen);
-                            std::ptr::write(r, t);
-                        }
+                        rotate_left_shift!(&mut s[left .. right], 1);
                         return
                     },
                     2 => {
-                        unsafe {
-                            let mut tmp: [T; 2] = std::mem::uninitialized();
-                            let l = s.as_mut_ptr().offset(left as isize);
-                            let r = s.as_mut_ptr().offset((right - 2) as isize);
-                            let t = tmp.as_mut_ptr();
-                            std::ptr::copy_nonoverlapping(l, t, 2);
-                            std::ptr::copy(l.offset(2), l, rlen);
-                            std::ptr::copy_nonoverlapping(t, r, 2);
-                            std::mem::forget(tmp);
-                        }
+                        rotate_left_shift!(&mut s[left .. right], 2);
                         return
                     },
                     _  if rlen / 2 > llen => {
@@ -224,26 +241,11 @@ fn rotate<T>(s: &mut [T], k: usize) {
             Ordering::Greater => {
                 match rlen {
                     1 => {
-                        unsafe {
-                            let l = s.as_mut_ptr().offset(left as isize);
-                            let r = s.as_mut_ptr().offset((right - 1) as isize);
-                            let t = std::ptr::read(r);
-                            std::ptr::copy(l, l.offset(1), llen);
-                            std::ptr::write(l, t);
-                        }
+                        rotate_right_shift!(&mut s[left .. right], 1);
                         return
                     },
                     2 => {
-                        unsafe {
-                            let mut tmp: [T; 2] = std::mem::uninitialized();
-                            let l = s.as_mut_ptr().offset(left as isize);
-                            let r = s.as_mut_ptr().offset((right - 2) as isize);
-                            let t = tmp.as_mut_ptr();
-                            std::ptr::copy_nonoverlapping(r, t, 2);
-                            std::ptr::copy(l, l.offset(2), llen);
-                            std::ptr::copy_nonoverlapping(t, l, 2);
-                            std::mem::forget(tmp);
-                        }
+                        rotate_right_shift!(&mut s[left .. right], 2);
                         return
                     },
                     _ if llen / 2 > rlen => {
