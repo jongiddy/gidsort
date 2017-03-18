@@ -199,62 +199,41 @@ fn rotate_right_shift<T>(s: &mut [T], rlen: usize) {
     }
 }
 
-fn rotate<T>(s: &mut [T], k: usize) {
-    // Rotate the last k elements to the front of the slice.
-    // given a slice of 0..n, move n-k..n to front and 0..n-k to end
-    let mut left = 0;
-    let mut right = s.len();
-    debug_assert!(k <= right);
-    let mut llen = right - k;
-    let mut rlen = k;
+fn rotate<T>(s: &mut [T], rlen: usize) {
+    // Rotate the last rlen elements to the front of the slice.
+    // given a slice of 0..n, move n-rlen..n to front and 0..n-rlen to end
+    let length = s.len();
+    debug_assert!(rlen <= length);
+    let llen = length - rlen;
+    let rlen = rlen;
     if llen == 0 || rlen == 0 {
         return
     }
-    // Rotate two sections by swapping the ends repeatedly.  If there's just one element to swap at
-    // one end, pull it out into a temporary, and shift everything else up/down 1 position.  If
-    // the sides are unbalanced, use one of the methods from rotate_gcd.
-    loop {
-        match llen.cmp(&rlen) {
-            Ordering::Less => {
-                match llen {
-                    1 ... MAX_ROTATE_SHIFT => {
-                        rotate_left_shift(&mut s[left .. right], llen);
-                        return
-                    },
-                    _ if llen < rlen / 2 => {
-                        rotate_gcd(&mut s[left .. right], rlen);
-                        return
-                    },
-                    _ => {
-                        swap_ends(&mut s[left .. right], llen);
-                        right -= llen;
-                        rlen -= llen;
-                    }
-                }
-            },
-            Ordering::Greater => {
-                match rlen {
-                    1 ... MAX_ROTATE_SHIFT => {
-                        rotate_right_shift(&mut s[left .. right], rlen);
-                        return
-                    },
-                    _ if rlen < llen / 2 => {
-                        rotate_gcd(&mut s[left .. right], rlen);
-                        return
-                    },
-                    _ => {
-                        swap_ends(&mut s[left .. right], rlen);
-                        left += rlen;
-                        llen -= rlen;
-                    }
-                }
-            },
-            Ordering::Equal => {
-                swap_ends(&mut s[left .. right], llen);
-                return
+    match llen.cmp(&rlen) {
+        Ordering::Less => {
+            match llen {
+                1 ... MAX_ROTATE_SHIFT => {
+                    rotate_left_shift(s, llen);
+                    return
+                },
+                _ => {},
             }
+        },
+        Ordering::Greater => {
+            match rlen {
+                1 ... MAX_ROTATE_SHIFT => {
+                    rotate_right_shift(s, rlen);
+                    return
+                },
+                _ => {},
+            }
+        },
+        Ordering::Equal => {
+            swap_ends(s, llen);
+            return
         }
     }
+    rotate_gcd(s, rlen);
 }
 
 fn merge<T, F>(s: &mut [T], split: usize, compare: &F, leftright: Ordering, rightleft: Ordering)
