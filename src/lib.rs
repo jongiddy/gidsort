@@ -169,35 +169,33 @@ fn rotate_gcd<T>(s: &mut [T], k: usize) {
     }
 }
 
-macro_rules! rotate_left_shift {
-    ($s:expr, $llen:expr) => {
-        let rlen = $s.len() - $llen;
-        unsafe {
-            let mut tmp: [T; $llen] = std::mem::uninitialized();
-            let t = tmp.as_mut_ptr();
-            let l = $s.as_mut_ptr();
-            let r = $s.as_mut_ptr().offset(rlen as isize);
-            std::ptr::copy_nonoverlapping(l, t, $llen);
-            std::ptr::copy(l.offset($llen), l, rlen);
-            std::ptr::copy_nonoverlapping(t, r, $llen);
-            std::mem::forget(tmp);
-        }
+const MAX_ROTATE_SHIFT: usize = 4;
+
+fn rotate_left_shift<T>(s: &mut [T], llen: usize) {
+    let rlen = s.len() - llen;
+    unsafe {
+        let mut tmp: [T; MAX_ROTATE_SHIFT] = std::mem::uninitialized();
+        let t = tmp.as_mut_ptr();
+        let l = s.as_mut_ptr();
+        let r = s.as_mut_ptr().offset(rlen as isize);
+        std::ptr::copy_nonoverlapping(l, t, llen);
+        std::ptr::copy(l.offset(llen as isize), l, rlen);
+        std::ptr::copy_nonoverlapping(t, r, llen);
+        std::mem::forget(tmp);
     }
 }
 
-macro_rules! rotate_right_shift {
-    ($s:expr, $rlen:expr) => {
-        let llen = $s.len() - $rlen;
-        unsafe {
-            let mut tmp: [T; $rlen] = std::mem::uninitialized();
-            let t = tmp.as_mut_ptr();
-            let l = $s.as_mut_ptr();
-            let r = $s.as_mut_ptr().offset(llen as isize);
-            std::ptr::copy_nonoverlapping(r, t, $rlen);
-            std::ptr::copy(l, l.offset($rlen), llen);
-            std::ptr::copy_nonoverlapping(t, l, $rlen);
-            std::mem::forget(tmp);
-        }
+fn rotate_right_shift<T>(s: &mut [T], rlen: usize) {
+    let llen = s.len() - rlen;
+    unsafe {
+        let mut tmp: [T; MAX_ROTATE_SHIFT] = std::mem::uninitialized();
+        let t = tmp.as_mut_ptr();
+        let l = s.as_mut_ptr();
+        let r = s.as_mut_ptr().offset(llen as isize);
+        std::ptr::copy_nonoverlapping(r, t, rlen);
+        std::ptr::copy(l, l.offset(rlen as isize), llen);
+        std::ptr::copy_nonoverlapping(t, l, rlen);
+        std::mem::forget(tmp);
     }
 }
 
@@ -219,23 +217,11 @@ fn rotate<T>(s: &mut [T], k: usize) {
         match llen.cmp(&rlen) {
             Ordering::Less => {
                 match llen {
-                    1 => {
-                        rotate_left_shift!(&mut s[left .. right], 1);
+                    1 ... MAX_ROTATE_SHIFT => {
+                        rotate_left_shift(&mut s[left .. right], llen);
                         return
                     },
-                    2 => {
-                        rotate_left_shift!(&mut s[left .. right], 2);
-                        return
-                    },
-                    3 => {
-                        rotate_left_shift!(&mut s[left .. right], 3);
-                        return
-                    },
-                    4 => {
-                        rotate_left_shift!(&mut s[left .. right], 4);
-                        return
-                    },
-                    _  if rlen / 2 > llen => {
+                    _ if llen < rlen / 2 => {
                         rotate_gcd(&mut s[left .. right], rlen);
                         return
                     },
@@ -248,23 +234,11 @@ fn rotate<T>(s: &mut [T], k: usize) {
             },
             Ordering::Greater => {
                 match rlen {
-                    1 => {
-                        rotate_right_shift!(&mut s[left .. right], 1);
+                    1 ... MAX_ROTATE_SHIFT => {
+                        rotate_right_shift(&mut s[left .. right], rlen);
                         return
                     },
-                    2 => {
-                        rotate_right_shift!(&mut s[left .. right], 2);
-                        return
-                    },
-                    3 => {
-                        rotate_right_shift!(&mut s[left .. right], 3);
-                        return
-                    },
-                    4 => {
-                        rotate_right_shift!(&mut s[left .. right], 4);
-                        return
-                    },
-                    _ if llen / 2 > rlen => {
+                    _ if rlen < llen / 2 => {
                         rotate_gcd(&mut s[left .. right], rlen);
                         return
                     },
