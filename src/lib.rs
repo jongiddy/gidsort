@@ -231,6 +231,10 @@ fn rotate<T>(s: &mut [T], k: usize) {
                         rotate_left_shift!(&mut s[left .. right], 3);
                         return
                     },
+                    4 => {
+                        rotate_left_shift!(&mut s[left .. right], 4);
+                        return
+                    },
                     _  if rlen / 2 > llen => {
                         rotate_gcd(&mut s[left .. right], rlen);
                         return
@@ -254,6 +258,10 @@ fn rotate<T>(s: &mut [T], k: usize) {
                     },
                     3 => {
                         rotate_right_shift!(&mut s[left .. right], 3);
+                        return
+                    },
+                    4 => {
+                        rotate_right_shift!(&mut s[left .. right], 4);
                         return
                     },
                     _ if llen / 2 > rlen => {
