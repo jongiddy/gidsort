@@ -169,7 +169,7 @@ fn rotate_gcd<T>(s: &mut [T], k: usize) {
     }
 }
 
-const MAX_ROTATE_SHIFT: usize = 4;
+const MAX_ROTATE_SHIFT: usize = 16;
 
 fn rotate_left_shift<T>(s: &mut [T], llen: usize) {
     let rlen = s.len() - llen;
