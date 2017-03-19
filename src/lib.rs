@@ -163,27 +163,6 @@ fn rotate_gcd<T>(s: &mut [T], k: usize) {
         s.reverse();
         s[0 .. k].reverse();
         s[k .. slen].reverse();
-    } else if blksize * std::mem::size_of::<T>() <= STACK_OBJECT_SIZE {
-        // If the block size fits in the stack buffer, move the first block into the buffer to open
-        // up a hole. Then move it's source block (-k % slen) into the hole, opening up another
-        // hole.  Repeat until the source is 0.  Move the 0-block from the stack buffer into the
-        // final destination (k), and we're done.
-        let increment = (slen - k) as isize;
-        let slen = slen as isize;
-        unsafe {
-            let mut tmp: [u64; STACK_OBJECT_SIZE / 8] = std::mem::uninitialized();
-            let t = tmp.as_mut_ptr() as *mut T;
-            std::ptr::copy_nonoverlapping(s.as_ptr(), t, blksize);
-            let mut dst = 0 as isize;
-            let mut src = increment;
-            while src != 0 {
-                std::ptr::copy_nonoverlapping(s.as_ptr().offset(src), s.as_mut_ptr().offset(dst), blksize);
-                dst = src;
-                src = add_modulo(src, increment, slen);
-            }
-            std::ptr::copy_nonoverlapping(t, s.as_mut_ptr().offset(dst), blksize);
-            std::mem::forget(tmp);
-        }
     } else {
         // Otherwise, we move each block up by k positions, using the first block as working space.
         let mut j = k;
