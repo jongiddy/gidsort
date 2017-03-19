@@ -150,25 +150,46 @@ fn add_modulo<T>(a: T, b: T, n: T) -> T
 fn rotate_gcd<T>(s: &mut [T], k: usize) {
     // Rotate the last k elements to the front of the slice.
     // given a slice of 0..n, move n-k..n to front and 0..n-k to end
-    let n = s.len();
-    debug_assert!(k > 1 && k < n - 1);
-    // for i = 0..k, add size of second section: new position = (i + k) % n
-    // for i = k..n, subtract size of first section: new position = (i - n + k) % n = (i + k) % n
+    let slen = s.len();
+    debug_assert!(k > 1 && k < slen - 1);
+    // for i = 0..k, add size of second section: new position = (i + k) % slen
+    // for i = k..slen, subtract size of first section: new position = (i - slen + k) % slen = (i + k) % slen
     // so all elements need to have the same move applied
-    // There are gcd(k, n-k) cycles
-    let blksize = k.gcd(n - k);
+    // There are gcd(k, slen-k) cycles
+    let blksize = k.gcd(slen - k);
     if blksize < rotate_reverse_max!() {
         // If GCD is low, then we tend to stride through the slice moving a few elements at a
         // time.  In this case, the classic reverse everything twice algorithm performs faster.
         s.reverse();
         s[0 .. k].reverse();
-        s[k .. n].reverse();
+        s[k .. slen].reverse();
+    } else if blksize * std::mem::size_of::<T>() <= STACK_OBJECT_SIZE {
+        // If the block size fits in the stack buffer, move the first block into the buffer to open
+        // up a hole. Then move it's source block (-k % slen) into the hole, opening up another
+        // hole.  Repeat until the source is 0.  Move the 0-block from the stack buffer into the
+        // final destination (k), and we're done.
+        let increment = (slen - k) as isize;
+        let slen = slen as isize;
+        unsafe {
+            let mut tmp: [u64; STACK_OBJECT_SIZE / 8] = std::mem::uninitialized();
+            let t = tmp.as_mut_ptr() as *mut T;
+            std::ptr::copy_nonoverlapping(s.as_ptr(), t, blksize);
+            let mut dst = 0 as isize;
+            let mut src = increment;
+            while src != 0 {
+                std::ptr::copy_nonoverlapping(s.as_ptr().offset(src), s.as_mut_ptr().offset(dst), blksize);
+                dst = src;
+                src = add_modulo(src, increment, slen);
+            }
+            std::ptr::copy_nonoverlapping(t, s.as_mut_ptr().offset(dst), blksize);
+            std::mem::forget(tmp);
+        }
     } else {
         // Otherwise, we move each block up by k positions, using the first block as working space.
         let mut j = k;
-        for _ in 0 .. n / blksize - 1 {
+        for _ in 0 .. slen / blksize - 1 {
             swap_ends(&mut s[0 .. j + blksize], blksize);
-            j = add_modulo(j, k, n);
+            j = add_modulo(j, k, slen);
         }
     }
 }
