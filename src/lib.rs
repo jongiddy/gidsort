@@ -17,7 +17,7 @@ extern crate quickcheck;
 const STACK_OBJECT_SIZE: usize = 2048;
 
 // The maximum GCD for which reverse is used to rotate. Above this value, block swapping is used.
-macro_rules! rotate_reverse_max {() => (8)}
+const ROTATE_REVERSE_MAX: usize = 4;
 
 
 fn insertion_point<T, F>(
@@ -157,7 +157,7 @@ fn rotate_gcd<T>(s: &mut [T], k: usize) {
     // so all elements need to have the same move applied
     // There are gcd(k, slen-k) cycles
     let blksize = k.gcd(slen - k);
-    if blksize < rotate_reverse_max!() {
+    if blksize < ROTATE_REVERSE_MAX {
         // If GCD is low, then we tend to stride through the slice moving a few elements at a
         // time.  In this case, the classic reverse everything twice algorithm performs faster.
         s.reverse();
