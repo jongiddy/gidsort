@@ -184,11 +184,11 @@ fn rotate_left_shift<T>(s: &mut [T], llen: usize) {
         // So this seems to be the best we can do right now:
         let mut tmp: [u64; STACK_OBJECT_SIZE / 8] = std::mem::uninitialized();
         let t = tmp.as_mut_ptr() as *mut T;
-        let l = s.as_mut_ptr();
-        let r = s.as_mut_ptr().offset(rlen as isize);
-        std::ptr::copy_nonoverlapping(l, t, llen);
-        std::ptr::copy(l.offset(llen as isize), l, rlen);
-        std::ptr::copy_nonoverlapping(t, r, llen);
+        let src = s.as_ptr();
+        let dst = s.as_mut_ptr();
+        std::ptr::copy_nonoverlapping(src, t, llen);
+        std::ptr::copy(src.offset(llen as isize), dst, rlen);
+        std::ptr::copy_nonoverlapping(t, dst.offset(rlen as isize), llen);
         std::mem::forget(tmp);
     }
 }
@@ -199,11 +199,11 @@ fn rotate_right_shift<T>(s: &mut [T], rlen: usize) {
     unsafe {
         let mut tmp: [u64; STACK_OBJECT_SIZE / 8] = std::mem::uninitialized();
         let t = tmp.as_mut_ptr() as *mut T;
-        let l = s.as_mut_ptr();
-        let r = s.as_mut_ptr().offset(llen as isize);
-        std::ptr::copy_nonoverlapping(r, t, rlen);
-        std::ptr::copy(l, l.offset(rlen as isize), llen);
-        std::ptr::copy_nonoverlapping(t, l, rlen);
+        let src = s.as_ptr();
+        let dst = s.as_mut_ptr();
+        std::ptr::copy_nonoverlapping(src.offset(llen as isize), t, rlen);
+        std::ptr::copy(src, dst.offset(rlen as isize), llen);
+        std::ptr::copy_nonoverlapping(t, dst, rlen);
         std::mem::forget(tmp);
     }
 }
