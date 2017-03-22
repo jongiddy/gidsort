@@ -181,7 +181,12 @@ fn rotate_left_shift<T>(s: &mut [T], llen: usize) {
         // let mut tmp: [T; STACK_OBJECT_SIZE / std::mem::size_of::<T>()] = std::mem::uninitialized();
         // There's no way to express alignment: https://github.com/rust-lang/rfcs/issues/325
         // let mut tmp: [u8; STACK_OBJECT_SIZE] = std::mem::uninitialized();
-        // So this seems to be the best we can do right now:
+        // However, using u8's also solves a potential problem.  If tmp is [T] and T is Drop, then
+        // we need to use mem::forget to ensure the duplicated T's are not dropped.  This is easy,
+        // as long as the code cannot panic.  In a panic, the forget is not run, but and drop still
+        // runs.  There's a NoDrop trick using unstable unions, but using a type (like u8) that
+        // is not Drop and then casting a pointer also prevents T::drop being called.
+        // So, using u64 to improve alignment, this seems to be the best we can do right now:
         let mut tmp: [u64; STACK_OBJECT_SIZE / 8] = std::mem::uninitialized();
         let t = tmp.as_mut_ptr() as *mut T;
         let src = s.as_ptr();
@@ -189,7 +194,8 @@ fn rotate_left_shift<T>(s: &mut [T], llen: usize) {
         std::ptr::copy_nonoverlapping(src, t, llen);
         std::ptr::copy(src.offset(llen as isize), dst, rlen);
         std::ptr::copy_nonoverlapping(t, dst.offset(rlen as isize), llen);
-        std::mem::forget(tmp);
+        // forget not needed but keeping it here to remind us in case tmp creation changes:
+        // std::mem::forget(tmp);
     }
 }
 
@@ -204,7 +210,7 @@ fn rotate_right_shift<T>(s: &mut [T], rlen: usize) {
         std::ptr::copy_nonoverlapping(src.offset(llen as isize), t, rlen);
         std::ptr::copy(src, dst.offset(rlen as isize), llen);
         std::ptr::copy_nonoverlapping(t, dst, rlen);
-        std::mem::forget(tmp);
+        // std::mem::forget(tmp);
     }
 }
 
