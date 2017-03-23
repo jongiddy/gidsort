@@ -691,3 +691,30 @@ loop:
 							Method A1
 					find X in R where X[i] < M[0]
 ```
+
+However, this algorithm has a problem.
+Each time around the inner loop,
+we move values from the front of R and the front of M,
+opening up two gaps.
+
+To fill the gap between L and M, we basically choose to shift L or M.
+
+In typical mergesort, |L| and |R| start as n/2.
+As we shift values out of L, M gets bigger.
+At some point, L and M are (more or less) equal: |L| = |M| < n/4.
+So worst case, we are shifting n/4 elements on each iteration.
+
+Each iteration moves at least one value from M and one value from R, so there are n/2 iterations
+(ignoring the setup stage and any patterns that eliminate M).
+So, we're performing (n/2) x (n/4) = n<sup>2</sup>/8 shifts.
+Hence, the merge is potentially O(n<sup>2</sup>).
+
+To get a O(n log n) sort algorithm, the merge needs to be O(n).
+
+So, back to the drawing board.
+
+The problem is that two gaps are created.
+The gap between M and R is OK, as we can extend M with values moved out of L.
+Filling the gap between L and M is tricky.
+Adding another sequence just adds more bookkeeping and propagates the problem.
+Eventually, we need to remove an element from the front of this new sequence.
