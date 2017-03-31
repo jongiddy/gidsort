@@ -642,12 +642,17 @@ loop:
 					find X in R where X[i] < M[0]
 ```
 
+Following implementation the following changes were made to the algorithm:
+
 Since the Method D special case for |Z| == 0 is effectively covered by Method C, we can remove this case.
-Tests how the effect on performance is minor, but removal makes the algorithm simpler.
+Tests show the effect on performance is minor, but removal makes the algorithm simpler.
 
-Swaps are much cheaper than rotations, so rather than use the costs calculated above, the algorithm uses the constraints on when particular methods using swaps are valid.
+Swaps are much cheaper than rotations, so rather than use the costs calculated above,
+the algorithm uses the constraints on when particular methods are valid.
 
-The current algorithm as actually implemented is:
+The algorithm as actually implemented is:
+
+Algorithm H:
 
 ```
 find X in R where X[i] < L[0]
@@ -713,8 +718,90 @@ To get a O(n log n) sort algorithm, the merge needs to be O(n).
 
 So, back to the drawing board.
 
-The problem is that two gaps are created.
+The problem is that low values are removed from both M and R, and, as this is done, two gaps are created.
 The gap between M and R is OK, as we can extend M with values moved out of L.
 Filling the gap between L and M is tricky.
 Adding another sequence just adds more bookkeeping and propagates the problem.
 Eventually, we need to remove an element from the front of this new sequence.
+
+The alternative to creating new blocks in the gaps is to merge the new blocks immediately into a neighboring block.
+
+For example, as soon as we create an M sequence, merge it into R.
+If we insert M into R, then the highest value of M marks the start of the search for a new X.
+(We know that M<sub>max</sub> < L<sub>0</sub> but we know nothing about R<sub>0</sub> in comparison to L).
+
+This could be done as a recursive merge, using the algorithm we already have.  However, recursing would eliminate the O(1) memory use.
+
+An alternative would be to merge based on insertion sort.
+Insertion sort normally inserts unsorted data into a sorted sequence, but here we have an interesting property that the "unsorted" side is also sorted.
+
+This additional knowledge allows us to change many of the single shifts into multiple shifts, and importantly, they are shifts into the final position.
+
+For example, an algorithm for this insertion-merge could be:
+
+- Find the insertion point pos1 in R for the largest M value first.
+- Find the insertion point pos0 for the next largest value in M.
+- Swap M[max] with the value at R[pos0+1].
+- M now contains two values that go next to each other in the final sequence.
+- Rotate the sequence in R from pos0+1 .. pos1 left one, so all R values shift left and the M value moves to the end.
+- Set pos1 = pos0
+- Find the insertion point pos0 for the next largest value in M.
+- Swap two values above pos with the highest two values in M, and rotate left two
+- etc.
+
+Alternatively, when we move R<sub>low</sub> to L<sub>low</sub> and open a gap in front of R, open a similar gap at end of R (called B) by moving R<sub>high</sub> values and inserting them into L<sub>high</sub>. Call the sorted L<sub>high</sub> block H.  Move L<sub>low</sub> into B backwards.
+
+So, the gap at the front of R is filled with high values from R, and the gap at end of R is filled with low values from L. Note that |H| >= |B|.
+
+When values from B need to be moved back to L, move elements from end of B to L, move elements from H to B and mark them sorted.
+
+To make the insertion-merge algorithm more complete and general:
+
+```
+assert R[0] is lowest value
+assert L[max] is highest value
+
+- idx is the count of values in R known to be lower than L[0]
+- pos is the insertion point of the value at R[idx] in L
+
+idx = 1
+while |L| > 1:
+	idx = insertion point for L[0] in R[idx ..] + idx
+	# now R[idx] = first R element with non-zero insertion point in L
+	if idx == |R|:
+		# all of R is less than L
+		rotate [L,R], R
+		return
+	# we know R[idx] > L[0], so exclude it
+	pos = insertion point for R[idx] in L[1 .. -1] + 1
+	# now R[idx] < L[pos]
+	if pos < idx:
+		# move lowest values in R to leftmost position in L
+		swap L[..pos] and R[..pos]
+		# the new R[..pos] are > R[idx - 1] but < R[idx]
+		rotate R[..idx], idx - pos
+		# L[.. pos] are now the lowest values in correct position:
+		# add them to sorted by trimming L
+		L = L[pos..]
+		# the values moved to R are still < R[idx] and in fact
+		# R[idx] is the next lowest value and is less than L[0] (was L[pos])
+		idx += 1
+	else:
+		# move the highest values in L[..pos] out of the way to allow us to
+		# shift the lowest values from R to front of sequence.  Do this by
+		# swapping the high L values and the low R values, then rotating the
+		# low L values into their final position.
+		swap L[pos - idx .. pos], R[.. idx]
+		rotate L[.. pos], idx
+		# L[.. pos] are now the lowest values in correct position:
+		# add them to sorted by trimming L
+		L = L[pos ..]
+		# the highest values moved to R are still < R[idx] and in fact
+		# R[idx] is the next lowest value and is less than L[0] (was L[pos])
+		idx += 1
+# when |L| == 1, we know that L[max] is greater than all values in R
+rotate [L,R], R
+return
+```
+
+So, can we simplify further and just use insertion-merge as the merge step of our algorithm?
