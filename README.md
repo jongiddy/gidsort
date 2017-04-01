@@ -768,10 +768,13 @@ idx = 1
 while |L| > 1:
 	idx = insertion point for L[0] in R[idx ..] + idx
 	# now R[idx] = first R element with non-zero insertion point in L
+	# This is almost the same as letting the main loop iterate through the
+	# R values and finding the insertion point to be 0, except it avoids
+	# calling lots of swaps and rotates for 0 (cheap, but not free) and it
+	# allows galloping to kick in if there are many R values before L[0]
 	if idx == |R|:
-		# all of R is less than L
-		rotate [L,R], R
-		return
+		# all values in R < all values in |L|
+		break
 	# we know R[idx] > L[0], so exclude it
 	pos = insertion point for R[idx] in L[1 .. -1] + 1
 	# now R[idx] < L[pos]
@@ -799,9 +802,73 @@ while |L| > 1:
 		# the highest values moved to R are still < R[idx] and in fact
 		# R[idx] is the next lowest value and is less than L[0] (was L[pos])
 		idx += 1
-# when |L| == 1, we know that L[max] is greater than all values in R
+# if |L| == 1, all values in R < all values in |L| (just L[max])
+# if idx == |R|, all values in R < all values in |L|
 rotate [L,R], R
 return
 ```
 
 So, can we simplify further and just use insertion-merge as the merge step of our algorithm?
+
+While both branches perform a swap and a rotate,
+the second branch rotates elements into their final position,
+while the first branch rotates just to keep the right hand side in order.
+Hence, the first branch does more bookkeeping work while the second branch generates more final product.
+As `idx` increases with each iteration, the first branch (`pos < idx`) branch becomes more likely as the algorithm proceeds.
+
+So, reducing `idx` whenever productive and efficient seems to be a useful enhancement.
+
+If `idx > |L|`, then the algorithm can swap `L` and `R[..|L|]`, placing `|L|` elements in their final
+position, and reducing `idx` by `|L|`.
+
+In the following algorithm, we also move the common code outside the `if`.
+
+```
+assert R[0] is lowest value
+assert L[max] is highest value
+
+- idx is the count of values in R known to be lower than L[0]
+- pos is the insertion point of the value at R[idx] in L
+
+idx = 1
+while |L| > 1:
+	idx = insertion point for L[0] in R[idx ..] + idx
+	# now R[idx] = first R element with non-zero insertion point in L
+	# This is almost the same as letting the main loop iterate through the
+	# R values and finding the insertion point to be 0, except it avoids
+	# calling lots of swaps and rotates for 0 (cheap, but not free) and it
+	# allows galloping to kick in if there are many R values before L[0]
+	if idx == |R|:
+		# all values in R < all values in |L|
+		break
+	if idx > |L|:
+		swap L and R[..|L|]
+		# adjust the indexes tracking L and R
+		idx -= |L|
+		# idx > 0, so invariant that R[0] is minimum still holds
+	# we know R[idx] > L[0], so exclude it
+	pos = insertion point for R[idx] in L[1 .. -1] + 1
+	# now R[idx] < L[pos]
+	if pos < idx:
+		# move lowest values in R to leftmost position in L
+		swap L[..pos] and R[..pos]
+		# the new R[..pos] are > R[idx - 1] but < R[idx]
+		rotate R[..idx], idx - pos
+	else:
+		# move the highest values in L[..pos] out of the way to allow us to
+		# shift the lowest values from R to front of sequence.  Do this by
+		# swapping the high L values and the low R values, then rotating the
+		# low L values into their final position.
+		swap L[pos - idx .. pos], R[.. idx]
+		rotate L[.. pos], idx
+	# L[.. pos] are now the lowest values in correct position:
+	# add them to sorted by trimming L
+	L = L[pos ..]
+	# the highest values moved to R are still < R[idx] and in fact
+	# R[idx] is the next lowest value and is less than L[0] (was L[pos])
+	idx += 1
+# if |L| == 1, all values in R < all values in |L| (just L[max])
+# if idx == |R|, all values in R < all values in |L|
+rotate [L,R], R
+return
+```
