@@ -19,6 +19,20 @@ const STACK_OBJECT_SIZE: usize = 2048;
 // The maximum GCD for which reverse is used to rotate. Above this value, block swapping is used.
 const ROTATE_REVERSE_MAX: usize = 4;
 
+// equivalent to unstable Ordering::then
+trait IfEqual {
+    fn if_equal(self, other: Ordering) -> Ordering;
+}
+
+impl IfEqual for Ordering {
+    #[inline]
+    fn if_equal(self, other: Ordering) -> Ordering {
+        match self {
+            Ordering::Equal => other,
+            _ => self,
+        }
+    }
+}
 
 fn insertion_point<T, F>(
     value: &T, buffer: &[T], compare: &F, when_equal: Ordering, initial: usize, offset: usize
@@ -66,11 +80,7 @@ fn insertion_point<T, F>(
     let mut p2 = offset;
     while p2 - offset + initial < length {
         let trial = p2 - offset + initial;
-        let mut leg = compare(value, &buffer[trial]);
-        if leg == Ordering::Equal {
-            leg = when_equal;
-        };
-        match leg {
+        match compare(value, &buffer[trial]).if_equal(when_equal) {
             Ordering::Less => {
                 hi = trial;
                 break;
@@ -92,11 +102,7 @@ fn insertion_point<T, F>(
     while hi > lo {
         let trial = lo + (hi - lo) / 2;
         debug_assert!(trial < length);
-        let mut leg = compare(value, &buffer[trial]);
-        if leg == Ordering::Equal {
-            leg = when_equal;
-        };
-        match leg {
+        match compare(value, &buffer[trial]).if_equal(when_equal) {
             Ordering::Less => {
                 hi = trial;
             },
