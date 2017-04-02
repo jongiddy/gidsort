@@ -821,7 +821,11 @@ So, reducing `idx` whenever productive and efficient seems to be a useful enhanc
 If `idx > |L|`, then the algorithm can swap `L` and `R[..|L|]`, placing `|L|` elements in their final
 position, and reducing `idx` by `|L|`.
 
+We can also consider using rotation for smaller values of `idx`, especially to benefit from the stack buffer.
+
 In the following algorithm, we also move the common code outside the `if`.
+
+Algorithm I:
 
 ```
 assert R[0] is lowest value
@@ -841,10 +845,10 @@ while |L| > 1:
 	if idx == |R|:
 		# all values in R < all values in |L|
 		break
-	if idx > |L|:
-		swap L and R[..|L|]
+	if idx > some_size():
+		rotate L and some_size() values of R
 		# adjust the indexes tracking L and R
-		idx -= |L|
+		idx -= some_size()
 		# idx > 0, so invariant that R[0] is minimum still holds
 	# we know R[idx] > L[0], so exclude it
 	pos = insertion point for R[idx] in L[1 .. -1] + 1

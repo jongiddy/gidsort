@@ -82,28 +82,28 @@ macro_rules! sort_bench {
     }
 }
 
-sort_bench!(small_random_306035c21, gen_random, 10);
-sort_bench!(small_ascending_306035c21, gen_ascending, 10);
-sort_bench!(small_descending_306035c21, gen_descending, 10);
+sort_bench!(small_random_5e122f59b, gen_random, 10);
+sort_bench!(small_ascending_5e122f59b, gen_ascending, 10);
+sort_bench!(small_descending_5e122f59b, gen_descending, 10);
 
-sort_bench!(small_big_random_306035c21, gen_big_random, 10);
-sort_bench!(small_big_ascending_306035c21, gen_big_ascending, 10);
-sort_bench!(small_big_descending_306035c21, gen_big_descending, 10);
+sort_bench!(small_big_random_5e122f59b, gen_big_random, 10);
+sort_bench!(small_big_ascending_5e122f59b, gen_big_ascending, 10);
+sort_bench!(small_big_descending_5e122f59b, gen_big_descending, 10);
 
-sort_bench!(medium_random_306035c21, gen_random, 100);
-sort_bench!(medium_ascending_306035c21, gen_ascending, 100);
-sort_bench!(medium_descending_306035c21, gen_descending, 100);
+sort_bench!(medium_random_5e122f59b, gen_random, 100);
+sort_bench!(medium_ascending_5e122f59b, gen_ascending, 100);
+sort_bench!(medium_descending_5e122f59b, gen_descending, 100);
 
-sort_bench!(large_short_runs_306035c21, gen_short_runs, 10000);
-sort_bench!(large_random_306035c21, gen_random, 10000);
-sort_bench!(large_ascending_306035c21, gen_ascending, 10000);
-sort_bench!(large_descending_306035c21, gen_descending, 10000);
-sort_bench!(large_mostly_ascending_306035c21, gen_mostly_ascending, 10000);
-sort_bench!(large_mostly_descending_306035c21, gen_mostly_descending, 10000);
+sort_bench!(large_short_runs_5e122f59b, gen_short_runs, 10000);
+sort_bench!(large_random_5e122f59b, gen_random, 10000);
+sort_bench!(large_ascending_5e122f59b, gen_ascending, 10000);
+sort_bench!(large_descending_5e122f59b, gen_descending, 10000);
+sort_bench!(large_mostly_ascending_5e122f59b, gen_mostly_ascending, 10000);
+sort_bench!(large_mostly_descending_5e122f59b, gen_mostly_descending, 10000);
 
-sort_bench!(large_big_random_306035c21, gen_big_random, 10000);
-sort_bench!(large_big_ascending_306035c21, gen_big_ascending, 10000);
-sort_bench!(large_big_descending_306035c21, gen_big_descending, 10000);
+sort_bench!(large_big_random_5e122f59b, gen_big_random, 10000);
+sort_bench!(large_big_ascending_5e122f59b, gen_big_ascending, 10000);
+sort_bench!(large_big_descending_5e122f59b, gen_big_descending, 10000);
 
 macro_rules! new_sort_bench {
     ($name:ident, $gen:expr, $len:expr) => {
