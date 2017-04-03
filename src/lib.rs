@@ -35,10 +35,10 @@ impl IfEqual for Ordering {
 }
 
 fn insertion_point<T, F>(
-    value: &T, buffer: &[T], compare: &F, when_equal: Ordering, initial: usize, offset: usize
+    value: &T, buffer: &[T], compare: &F, initial: usize, offset: usize
 ) -> usize
-    where
-        F: Fn(&T, &T) -> Ordering
+where
+    F: Fn(&T, &T) -> Ordering
 {
     // Find the insertion point in an ordered buffer where the value should be inserted to maintain
     // the ordering.  All elements to the left of the insertion point are Less than the value and
@@ -80,7 +80,7 @@ fn insertion_point<T, F>(
     let mut p2 = offset;
     while p2 - offset + initial < length {
         let trial = p2 - offset + initial;
-        match compare(value, &buffer[trial]).if_equal(when_equal) {
+        match compare(value, &buffer[trial]) {
             Ordering::Less => {
                 hi = trial;
                 break;
@@ -102,7 +102,7 @@ fn insertion_point<T, F>(
     while hi > lo {
         let trial = lo + (hi - lo) / 2;
         debug_assert!(trial < length);
-        match compare(value, &buffer[trial]).if_equal(when_equal) {
+        match compare(value, &buffer[trial]) {
             Ordering::Less => {
                 hi = trial;
             },
@@ -251,9 +251,12 @@ fn rotate<T>(s: &mut [T], rlen: usize) {
     rotate_gcd(s, rlen);
 }
 
-fn insertion_merge<T, F>(s: &mut [T], split: usize, compare: &F, leftright: Ordering, rightleft: Ordering)
-    where
-        F: Fn(&T, &T) -> Ordering
+fn insertion_merge<T, F, G>(
+    s: &mut [T], split: usize, cmpleftright: &F, cmprightleft: &G
+)
+where
+    F: Fn(&T, &T) -> Ordering,
+    G: Fn(&T, &T) -> Ordering
 {
     let mut l0 = 0;
     let mut r0 = split;
@@ -268,7 +271,7 @@ fn insertion_merge<T, F>(s: &mut [T], split: usize, compare: &F, leftright: Orde
 
     // R may contain values that are higher than l_max.  These values are already in their final
     // position, so we can move them from R to S1.
-    let pos = insertion_point(&s[r0 - 1], &s[r0 .. r1], compare, leftright, 0, r1);
+    let pos = insertion_point(&s[r0 - 1], &s[r0 .. r1], cmpleftright, 0, r1);
     if pos == 0 {
         // l_max < r_0 -> L-R is already sorted
         //
@@ -293,7 +296,7 @@ fn insertion_merge<T, F>(s: &mut [T], split: usize, compare: &F, leftright: Orde
     // L may contain values that are lower than r_0.  These values are already in their final
     // position, so we can move them from L to S0.  Note, we ignore l_max since we know it is
     // larger than r_0.  This is why we don't need to test whether |L| = 0.
-    let pos = insertion_point(&s[r0], &s[l0 .. r0 - 1], compare, rightleft, 0, 1);
+    let pos = insertion_point(&s[r0], &s[l0 .. r0 - 1], cmprightleft, 0, 1);
     l0 += pos;
     // r0 is smallest value
 
@@ -305,14 +308,18 @@ fn insertion_merge<T, F>(s: &mut [T], split: usize, compare: &F, leftright: Orde
     }
 
     // At this point, we have several invariants:
-    debug_assert!(compare(&s[l0], &s[r0]) != Ordering::Less);           // 1. r_0 is min value
-    debug_assert!(compare(&s[r1 - 1], &s[r0 - 1]) != Ordering::Greater);// 2. l_max is max value
-    debug_assert!(llen!() > 1);                                         // 3. |L| > 1
-    debug_assert!(rlen!() > 1);                                         // 5. |R| > 1
+    // 1. r_0 is min value
+    debug_assert!(cmpleftright(&s[l0], &s[r0]) != Ordering::Less);
+    // 2. l_max is max value
+    debug_assert!(cmprightleft(&s[r1 - 1], &s[r0 - 1]) != Ordering::Greater);
+    // 3. |L| > 1
+    debug_assert!(llen!() > 1);
+    // 4. |R| > 1
+    debug_assert!(rlen!() > 1);
 
     let mut idx = 1;
     while llen!() > 1 {
-        idx = insertion_point(&s[l0], &s[r0 + idx .. r1], compare, leftright, 0, r1) + idx;
+        idx = insertion_point(&s[l0], &s[r0 + idx .. r1], cmpleftright, 0, r1) + idx;
         // now R[idx] = first R element with non-zero insertion point in L
         if idx == rlen!() {
             // all of R is less than L
@@ -335,7 +342,7 @@ fn insertion_merge<T, F>(s: &mut [T], split: usize, compare: &F, leftright: Orde
             idx = 1;
         }
         // we know R[idx] > L[0], so exclude it
-        let pos = insertion_point(&s[r0 + idx], &s[l0 + 1 .. r0 - 1], compare, rightleft, 0, 1) + 1;
+        let pos = insertion_point(&s[r0 + idx], &s[l0 + 1 .. r0 - 1], cmprightleft, 0, 1) + 1;
         // now R[idx] < L[pos]
         if pos < idx {
             // move lowest values in R to leftmost position in L
@@ -361,9 +368,10 @@ fn insertion_merge<T, F>(s: &mut [T], split: usize, compare: &F, leftright: Orde
     rotate(&mut s[l0 .. r1], rlen!());
 }
 
-fn merge<T, F>(s: &mut [T], split: usize, compare: &F, leftright: Ordering, rightleft: Ordering)
-    where
-        F: Fn(&T, &T) -> Ordering
+fn merge<T, F, G>(s: &mut [T], split: usize, cmpleftright: &F, cmprightleft: &G)
+where
+    F: Fn(&T, &T) -> Ordering,
+    G: Fn(&T, &T) -> Ordering
 {
     // The slice to be sorted is divided into S0 | L | M | R | S1
     // The indexes into the slice are l0, m0, r0, r1
@@ -382,7 +390,7 @@ fn merge<T, F>(s: &mut [T], split: usize, compare: &F, leftright: Ordering, righ
 
     // R may contain values that are higher than l_max.  These values are already in their final
     // position, so we can move them from R to S1.
-    let pos = insertion_point(&s[m0 - 1], &s[r0 .. r1], compare, leftright, 0, r1);
+    let pos = insertion_point(&s[m0 - 1], &s[r0 .. r1], cmpleftright, 0, r1);
     if pos == 0 {
         // l_max < r_0 -> L-R is already sorted
         //
@@ -407,7 +415,7 @@ fn merge<T, F>(s: &mut [T], split: usize, compare: &F, leftright: Ordering, righ
     // L may contain values that are lower than r_0.  These values are already in their final
     // position, so we can move them from L to S0.  Note, we ignore l_max since we know it is
     // larger than r_0.  This is why we don't need to test whether |L| = 0.
-    let pos = insertion_point(&s[r0], &s[l0 .. m0 - 1], compare, rightleft, 0, 1);
+    let pos = insertion_point(&s[r0], &s[l0 .. m0 - 1], cmprightleft, 0, 1);
     l0 += pos;
     // r0 is smallest value
 
@@ -419,15 +427,20 @@ fn merge<T, F>(s: &mut [T], split: usize, compare: &F, leftright: Ordering, righ
     }
 
     // At this point, we have several invariants:
-    debug_assert!(compare(&s[l0], &s[r0]) != Ordering::Less);           // 1. r_0 is min value
-    debug_assert!(compare(&s[r1 - 1], &s[m0 - 1]) != Ordering::Greater);// 2. l_max is max value
-    debug_assert!(llen!() > 1);                                         // 3. |L| > 1
-    debug_assert!(mlen!() == 0);                                        // 4. |M| == 0
-    debug_assert!(rlen!() > 1);                                         // 5. |R| > 1
+    // 1. r_0 is min value
+    debug_assert!(cmpleftright(&s[l0], &s[r0]) != Ordering::Less);
+    // 2. l_max is max value
+    debug_assert!(cmprightleft(&s[r1 - 1], &s[m0 - 1]) != Ordering::Greater);
+    // 3. |L| > 1
+    debug_assert!(llen!() > 1);
+    // 4. |M| == 0
+    debug_assert!(mlen!() == 0);
+    // 5. |R| > 1
+    debug_assert!(rlen!() > 1);
 
     // find X in R where X[i] < L[0]
     // - Since R[0] is minimum, L[0] > R[0], so exclude R[0] from search
-    let mut xlen = insertion_point(&s[l0], &s[r0 + 1 .. r1], compare, leftright, 0, 1) + 1;
+    let mut xlen = insertion_point(&s[l0], &s[r0 + 1 .. r1], cmpleftright, 0, 1) + 1;
     loop {
         debug_assert!(mlen!() == 0);    // |M| == 0
         if xlen == rlen!() {
@@ -442,7 +455,7 @@ fn merge<T, F>(s: &mut [T], split: usize, compare: &F, leftright: Ordering, righ
         // - Since R[r0 + xlen] > L[0] from previous search, exclude L[0] from search
         // - this search relies on invariant |L| > 1, tested in assert
         debug_assert!(l0 + 1 <= m0 - 1);
-        let zlen = insertion_point(&s[r0 + xlen], &s[l0 + 1 .. m0 - 1], compare, rightleft, 0, 1) + 1;
+        let zlen = insertion_point(&s[r0 + xlen], &s[l0 + 1 .. m0 - 1], cmprightleft, 0, 1) + 1;
         if llen!() < xlen + zlen {
             // |L| < 2|X| + |Z|:
             // Method E1
@@ -458,7 +471,7 @@ fn merge<T, F>(s: &mut [T], split: usize, compare: &F, leftright: Ordering, righ
                 return;
             }
             debug_assert!(r0 + 1 < r1);
-            xlen = insertion_point(&s[l0], &s[r0 + 1 .. r1], compare, leftright, 0, 1) + 1;
+            xlen = insertion_point(&s[l0], &s[r0 + 1 .. r1], cmpleftright, 0, 1) + 1;
         }
         else {
             // Method E2
@@ -479,7 +492,7 @@ fn merge<T, F>(s: &mut [T], split: usize, compare: &F, leftright: Ordering, righ
             debug_assert!(mlen!() > 0); // |M| > 0
             // find X in R where X[i] < M[0]
             debug_assert!(r0 + 1 < r1);
-            xlen = insertion_point(&s[m0], &s[r0 + 1 .. r1], compare, leftright, 0, 1) + 1;
+            xlen = insertion_point(&s[m0], &s[r0 + 1 .. r1], cmpleftright, 0, 1) + 1;
             loop {
                 if llen!() < xlen {
                     // |L| < |X|:
@@ -500,11 +513,11 @@ fn merge<T, F>(s: &mut [T], split: usize, compare: &F, leftright: Ordering, righ
                     return
                 }
                 // find Y in M where Y[i] < R'[0]
-                let ylen = insertion_point(&s[r0 + xlen], &s[m0 + 1 .. r0], compare, rightleft, 0, 1) + 1;
+                let ylen = insertion_point(&s[r0 + xlen], &s[m0 + 1 .. r0], cmprightleft, 0, 1) + 1;
                 if ylen == mlen!() {
                     // |Y| == |M|:
                     // find Z in L where Z[i] < R'[0]
-                    let zlen = insertion_point(&s[r0 + xlen], &s[l0 .. m0 - 1], compare, rightleft, 0, 1);
+                    let zlen = insertion_point(&s[r0 + xlen], &s[l0 .. m0 - 1], cmprightleft, 0, 1);
                     // Methods C1 and C3 both start with a rotate of Y - X
                     rotate(&mut s[m0 .. r0 + xlen], xlen);
                     if llen!() < xlen + ylen + zlen {
@@ -523,7 +536,7 @@ fn merge<T, F>(s: &mut [T], split: usize, compare: &F, leftright: Ordering, righ
                         }
                         // find X in R where X[i] < L[0]
                         debug_assert!(r0 + 1 < r1);
-                        xlen = insertion_point(&s[l0], &s[r0 + 1 .. r1], compare, leftright, 0, 1) + 1;
+                        xlen = insertion_point(&s[l0], &s[r0 + 1 .. r1], cmpleftright, 0, 1) + 1;
                         break
                     }
                     // Method C3
@@ -568,7 +581,7 @@ fn merge<T, F>(s: &mut [T], split: usize, compare: &F, leftright: Ordering, righ
                     return;
                 }
                 debug_assert!(r0 + 1 < r1);
-                xlen = insertion_point(&s[m0], &s[r0 + 1 .. r1], compare, leftright, 0, 1) + 1;
+                xlen = insertion_point(&s[m0], &s[r0 + 1 .. r1], cmpleftright, 0, 1) + 1;
             }
         }
     }
@@ -619,12 +632,13 @@ pub fn sort4<T, F>(s: &mut [T], compare: &F)
     }
 }
 
-pub fn sort_by<T, F>(s: &mut [T], compare: &F)
-    where
-        F: Fn(&T, &T) -> Ordering
+fn sort_by_ordering<T, F, G>(s: &mut [T], cmpleftright: &F, cmprightleft: &G)
+where
+    F: Fn(&T, &T) -> Ordering,
+    G: Fn(&T, &T) -> Ordering
 {
     let length = s.len();
-    sort4(s, compare);
+    sort4(s, cmpleftright);
     let mut blk = 4;  // size of blocks already sorted
     while blk < length {
         let mut start = 0;
@@ -634,9 +648,8 @@ pub fn sort_by<T, F>(s: &mut [T], compare: &F)
             insertion_merge(
                 &mut s[start .. min(end, length)],
                 blk,
-                compare,
-                Ordering::Less,
-                Ordering::Greater
+                cmpleftright,
+                cmprightleft
             );
             start = end;
             pivot = start + blk;
@@ -646,8 +659,20 @@ pub fn sort_by<T, F>(s: &mut [T], compare: &F)
     }
 }
 
+pub fn sort_by<T, F>(s: &mut [T], compare: &F)
+where
+    F: Fn(&T, &T) -> Ordering
+{
+    sort_by_ordering(
+        s,
+        &|ref a, ref b|{compare(&a, &b).if_equal(Ordering::Less)},
+        &|ref a, ref b|{compare(&a, &b).if_equal(Ordering::Greater)}
+    )
+}
+
 pub fn sort<T>(s: &mut [T])
-    where T: Ord
+where
+    T: Ord
 {
     sort_by(s, &T::cmp);
 }
@@ -656,6 +681,7 @@ pub fn sort<T>(s: &mut [T])
 mod tests {
     use std::cell::Cell;
     use std::cmp::Ordering;
+    use super::IfEqual;
 
     // A non-copy but comparable type is useful for testing, as bad moves are hidden by Copy types.
     #[derive(PartialEq,Eq,PartialOrd,Ord,Debug)]
@@ -756,9 +782,8 @@ mod tests {
     fn merge_0() {
         let mut s: [i32; 0] = [];
         let count = Cell::new(0);
-        super::merge(
-            &mut s, 0, &|&a, &b|{count.set(count.get() + 1); a.cmp(&b)}, Ordering::Less, Ordering::Greater
-        );
+        let compare = |a: &i32, b: &i32|{count.set(count.get() + 1); i32::cmp(&a, &b)};
+        super::merge(&mut s, 0, &compare, &compare);
         assert_eq!(count.get(), 0);
     }
 
@@ -766,9 +791,8 @@ mod tests {
     fn merge_0_1() {
         let mut s = [1];
         let count = Cell::new(0);
-        super::merge(
-            &mut s, 0, &|&a, &b|{count.set(count.get() + 1); a.cmp(&b)}, Ordering::Less, Ordering::Greater
-        );
+        let compare = |a: &i32, b: &i32|{count.set(count.get() + 1); i32::cmp(&a, &b)};
+        super::merge(&mut s, 0, &compare, &compare);
         assert_eq!(count.get(), 0);
         assert_eq!(s[0], 1);
     }
@@ -777,9 +801,8 @@ mod tests {
     fn merge_1_0() {
         let mut s = [1];
         let count = Cell::new(0);
-        super::merge(
-            &mut s, 1, &|&a, &b|{count.set(count.get() + 1); a.cmp(&b)}, Ordering::Less, Ordering::Greater
-        );
+        let compare = |a: &i32, b: &i32|{count.set(count.get() + 1); i32::cmp(&a, &b)};
+        super::merge(&mut s, 1, &compare, &compare);
         assert_eq!(count.get(), 0);
         assert_eq!(s[0], 1);
     }
@@ -788,9 +811,8 @@ mod tests {
     fn merge_1_1_ordered() {
         let mut s = [1, 2];
         let count = Cell::new(0);
-        super::merge(
-            &mut s, 1, &|&a, &b|{count.set(count.get() + 1); a.cmp(&b)}, Ordering::Less, Ordering::Greater
-        );
+        let compare = |a: &i32, b: &i32|{count.set(count.get() + 1); i32::cmp(&a, &b)};
+        super::merge(&mut s, 1, &compare, &compare);
         assert_eq!(count.get(), 1);
         assert_eq!(s[0], 1);
         assert_eq!(s[1], 2);
@@ -800,9 +822,8 @@ mod tests {
     fn merge_1_1_unordered() {
         let mut s = [2, 1];
         let count = Cell::new(0);
-        super::merge(
-            &mut s, 1, &|&a, &b|{count.set(count.get() + 1); a.cmp(&b)}, Ordering::Less, Ordering::Greater
-        );
+        let compare = |a: &i32, b: &i32|{count.set(count.get() + 1); i32::cmp(&a, &b)};
+        super::merge(&mut s, 1, &compare, &compare);
         assert_eq!(count.get(), 1);
         assert_eq!(s[0], 1);
         assert_eq!(s[1], 2);
@@ -812,9 +833,8 @@ mod tests {
     fn merge_1_n() {
         let mut s = [7, 0, 1, 2, 3, 4, 5, 6, 8, 9, 10];
         let count = Cell::new(0);
-        super::merge(
-            &mut s, 1, &|&a, &b|{count.set(count.get() + 1); a.cmp(&b)}, Ordering::Less, Ordering::Greater
-        );
+        let compare = |a: &usize, b: &usize|{count.set(count.get() + 1); usize::cmp(&a, &b)};
+        super::merge(&mut s, 1, &compare, &compare);
         // assert_eq!(count.get(), 4);
         for (i, elem) in s.iter().enumerate() {
             assert_eq!(*elem, i);
@@ -826,9 +846,8 @@ mod tests {
         let mut s = [0, 1, 2, 3, 4, 5, 6, 8, 9, 10, 7];
         let count = Cell::new(0);
         let leftlen = s.len() - 1;
-        super::merge(
-            &mut s, leftlen, &|&a, &b|{count.set(count.get() + 1); a.cmp(&b)}, Ordering::Less, Ordering::Greater
-        );
+        let compare = |a: &usize, b: &usize|{count.set(count.get() + 1); usize::cmp(&a, &b)};
+        super::merge(&mut s, leftlen, &compare, &compare);
         // assert_eq!(count.get(), 5);
         for (i, elem) in s.iter().enumerate() {
             assert_eq!(*elem, i);
@@ -840,9 +859,8 @@ mod tests {
         let mut s = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
         let count = Cell::new(0);
         let leftlen = s.len() / 2;
-        super::merge(
-            &mut s, leftlen, &|&a, &b|{count.set(count.get() + 1); a.cmp(&b)}, Ordering::Less, Ordering::Greater
-        );
+        let compare = |a: &usize, b: &usize|{count.set(count.get() + 1); usize::cmp(&a, &b)};
+        super::merge(&mut s, leftlen, &compare, &compare);
         assert_eq!(count.get(), 1);
         for (i, elem) in s.iter().enumerate() {
             assert_eq!(*elem, i);
@@ -856,7 +874,7 @@ mod tests {
             Nc(1), Nc(3), Nc(5), Nc(7), Nc(9), Nc(11), Nc(13), Nc(15)
         ];
         let leftlen = s.len() / 2;
-        super::merge(&mut s, leftlen, &Nc::cmp, Ordering::Less, Ordering::Greater);
+        super::merge(&mut s, leftlen, &Nc::cmp, &Nc::cmp);
         for (i, elem) in s.iter().enumerate() {
             assert_eq!(*elem, Nc(i as i32));
         }
@@ -866,9 +884,8 @@ mod tests {
     fn insertion_merge_0() {
         let mut s: [i32; 0] = [];
         let count = Cell::new(0);
-        super::insertion_merge(
-            &mut s, 0, &|&a, &b|{count.set(count.get() + 1); a.cmp(&b)}, Ordering::Less, Ordering::Greater
-        );
+        let compare = |a: &i32, b: &i32|{count.set(count.get() + 1); i32::cmp(&a, &b)};
+        super::insertion_merge(&mut s, 0, &compare, &compare);
         assert_eq!(count.get(), 0);
     }
 
@@ -876,9 +893,8 @@ mod tests {
     fn insertion_merge_0_1() {
         let mut s = [1];
         let count = Cell::new(0);
-        super::insertion_merge(
-            &mut s, 0, &|&a, &b|{count.set(count.get() + 1); a.cmp(&b)}, Ordering::Less, Ordering::Greater
-        );
+        let compare = |a: &i32, b: &i32|{count.set(count.get() + 1); i32::cmp(&a, &b)};
+        super::insertion_merge(&mut s, 0, &compare, &compare);
         assert_eq!(count.get(), 0);
         assert_eq!(s[0], 1);
     }
@@ -887,9 +903,8 @@ mod tests {
     fn insertion_merge_1_0() {
         let mut s = [1];
         let count = Cell::new(0);
-        super::insertion_merge(
-            &mut s, 1, &|&a, &b|{count.set(count.get() + 1); a.cmp(&b)}, Ordering::Less, Ordering::Greater
-        );
+        let compare = |a: &i32, b: &i32|{count.set(count.get() + 1); i32::cmp(&a, &b)};
+        super::insertion_merge(&mut s, 1, &compare, &compare);
         assert_eq!(count.get(), 0);
         assert_eq!(s[0], 1);
     }
@@ -898,9 +913,8 @@ mod tests {
     fn insertion_merge_1_1_ordered() {
         let mut s = [1, 2];
         let count = Cell::new(0);
-        super::insertion_merge(
-            &mut s, 1, &|&a, &b|{count.set(count.get() + 1); a.cmp(&b)}, Ordering::Less, Ordering::Greater
-        );
+        let compare = |a: &i32, b: &i32|{count.set(count.get() + 1); i32::cmp(&a, &b)};
+        super::insertion_merge(&mut s, 1, &compare, &compare);
         assert_eq!(count.get(), 1);
         assert_eq!(s[0], 1);
         assert_eq!(s[1], 2);
@@ -910,9 +924,8 @@ mod tests {
     fn insertion_merge_1_1_unordered() {
         let mut s = [2, 1];
         let count = Cell::new(0);
-        super::insertion_merge(
-            &mut s, 1, &|&a, &b|{count.set(count.get() + 1); a.cmp(&b)}, Ordering::Less, Ordering::Greater
-        );
+        let compare = |a: &i32, b: &i32|{count.set(count.get() + 1); i32::cmp(&a, &b)};
+        super::insertion_merge(&mut s, 1, &compare, &compare);
         assert_eq!(count.get(), 1);
         assert_eq!(s[0], 1);
         assert_eq!(s[1], 2);
@@ -922,9 +935,8 @@ mod tests {
     fn insertion_merge_1_n() {
         let mut s = [7, 0, 1, 2, 3, 4, 5, 6, 8, 9, 10];
         let count = Cell::new(0);
-        super::insertion_merge(
-            &mut s, 1, &|&a, &b|{count.set(count.get() + 1); a.cmp(&b)}, Ordering::Less, Ordering::Greater
-        );
+        let compare = |a: &usize, b: &usize|{count.set(count.get() + 1); usize::cmp(&a, &b)};
+        super::insertion_merge(&mut s, 1, &compare, &compare);
         // assert_eq!(count.get(), 4);
         for (i, elem) in s.iter().enumerate() {
             assert_eq!(*elem, i);
@@ -936,9 +948,8 @@ mod tests {
         let mut s = [0, 1, 2, 3, 4, 5, 6, 8, 9, 10, 7];
         let count = Cell::new(0);
         let leftlen = s.len() - 1;
-        super::insertion_merge(
-            &mut s, leftlen, &|&a, &b|{count.set(count.get() + 1); a.cmp(&b)}, Ordering::Less, Ordering::Greater
-        );
+        let compare = |a: &usize, b: &usize|{count.set(count.get() + 1); usize::cmp(&a, &b)};
+        super::insertion_merge(&mut s, leftlen, &compare, &compare);
         // assert_eq!(count.get(), 5);
         for (i, elem) in s.iter().enumerate() {
             assert_eq!(*elem, i);
@@ -950,9 +961,8 @@ mod tests {
         let mut s = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
         let count = Cell::new(0);
         let leftlen = s.len() / 2;
-        super::insertion_merge(
-            &mut s, leftlen, &|&a, &b|{count.set(count.get() + 1); a.cmp(&b)}, Ordering::Less, Ordering::Greater
-        );
+        let compare = |a: &usize, b: &usize|{count.set(count.get() + 1); usize::cmp(&a, &b)};
+        super::insertion_merge(&mut s, leftlen, &compare, &compare);
         assert_eq!(count.get(), 1);
         for (i, elem) in s.iter().enumerate() {
             assert_eq!(*elem, i);
@@ -966,7 +976,7 @@ mod tests {
             Nc(1), Nc(3), Nc(5), Nc(7), Nc(9), Nc(11), Nc(13), Nc(15)
         ];
         let leftlen = s.len() / 2;
-        super::insertion_merge(&mut s, leftlen, &Nc::cmp, Ordering::Less, Ordering::Greater);
+        super::insertion_merge(&mut s, leftlen, &Nc::cmp, &Nc::cmp);
         for (i, elem) in s.iter().enumerate() {
             assert_eq!(*elem, Nc(i as i32));
         }
@@ -974,48 +984,50 @@ mod tests {
 
     #[test]
     fn bisect_0() {
-        assert_eq!(super::insertion_point(&Nc(3), &[], &Nc::cmp, Ordering::Less, 0, 1), 0)
+        assert_eq!(super::insertion_point(&Nc(3), &[], &Nc::cmp, 0, 1), 0)
     }
 
     #[test]
     fn bisect_1_before() {
-        assert_eq!(super::insertion_point(&Nc(1), &[Nc(2)], &Nc::cmp, Ordering::Less, 0, 1), 0)
+        assert_eq!(super::insertion_point(&Nc(1), &[Nc(2)], &Nc::cmp, 0, 1), 0)
     }
     #[test]
     fn bisect_1_after() {
-        assert_eq!(super::insertion_point(&Nc(3), &[Nc(2)], &Nc::cmp, Ordering::Less, 0, 1), 1)
+        assert_eq!(super::insertion_point(&Nc(3), &[Nc(2)], &Nc::cmp, 0, 1), 1)
     }
 
     #[test]
     fn bisect_2_before() {
-        assert_eq!(super::insertion_point(&Nc(1), &[Nc(2), Nc(4)], &Nc::cmp, Ordering::Less, 0, 1), 0)
+        assert_eq!(super::insertion_point(&Nc(1), &[Nc(2), Nc(4)], &Nc::cmp, 0, 1), 0)
     }
     #[test]
     fn bisect_2_middle() {
-        assert_eq!(super::insertion_point(&Nc(3), &[Nc(2), Nc(4)], &Nc::cmp, Ordering::Less, 0, 1), 1)
+        assert_eq!(super::insertion_point(&Nc(3), &[Nc(2), Nc(4)], &Nc::cmp, 0, 1), 1)
     }
     #[test]
     fn bisect_2_after() {
-        assert_eq!(super::insertion_point(&Nc(5), &[Nc(2), Nc(4)], &Nc::cmp, Ordering::Less, 0, 1), 2)
+        assert_eq!(super::insertion_point(&Nc(5), &[Nc(2), Nc(4)], &Nc::cmp, 0, 1), 2)
     }
 
     #[test]
     fn bisect_3_before() {
-        assert_eq!(super::insertion_point(&Nc(1), &[Nc(2), Nc(4), Nc(6)], &Nc::cmp, Ordering::Less, 0, 1), 0)
+        assert_eq!(super::insertion_point(&Nc(1), &[Nc(2), Nc(4), Nc(6)], &Nc::cmp, 0, 1), 0)
     }
     #[test]
     fn bisect_3_lt() {
-        // Use less-than if the value should be inserted before equal values
-        assert_eq!(super::insertion_point(&Nc(4), &[Nc(2), Nc(4), Nc(6)], &Nc::cmp, Ordering::Less, 0, 1), 1)
+        // Default to Ordering::Less if the value should be inserted before equal values
+        let compare = |a: &Nc, b: &Nc|{Nc::cmp(&a, &b).if_equal(Ordering::Less)};
+        assert_eq!(super::insertion_point(&Nc(4), &[Nc(2), Nc(4), Nc(6)], &compare, 0, 1), 1)
     }
     #[test]
     fn bisect_3_le() {
-        // Use less-than-or-equal if value should be inserted after equal values
-        assert_eq!(super::insertion_point(&Nc(4), &[Nc(2), Nc(4), Nc(6)], &Nc::cmp, Ordering::Greater, 0, 1), 2)
+        // Default to Ordering::Greater if value should be inserted after equal values
+        let compare = |a: &Nc, b: &Nc|{Nc::cmp(&a, &b).if_equal(Ordering::Greater)};
+        assert_eq!(super::insertion_point(&Nc(4), &[Nc(2), Nc(4), Nc(6)], &compare, 0, 1), 2)
     }
     #[test]
     fn bisect_3_after() {
-        assert_eq!(super::insertion_point(&Nc(7), &[Nc(2), Nc(4), Nc(6)], &Nc::cmp, Ordering::Less, 0, 1), 3)
+        assert_eq!(super::insertion_point(&Nc(7), &[Nc(2), Nc(4), Nc(6)], &Nc::cmp, 0, 1), 3)
     }
 
     #[test]
@@ -1024,7 +1036,7 @@ mod tests {
         let mut profile = Vec::new();
         for v in 0 .. s.len() + 1 {
             let count = Cell::new(0);
-            assert_eq!(super::insertion_point(&v, &s, &|&a, &b|{count.set(count.get() + 1); a.cmp(&b)}, Ordering::Less, s.len(), 1), v);
+            assert_eq!(super::insertion_point(&v, &s, &|&a, &b|{count.set(count.get() + 1); usize::cmp(&a, &b).if_equal(Ordering::Less)}, s.len(), 1), v);
             profile.push(count.get());
         }
         assert_eq!(profile, vec![4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4])
@@ -1036,7 +1048,7 @@ mod tests {
         let mut profile = Vec::new();
         for v in 0 .. s.len() + 1 {
             let count = Cell::new(0);
-            assert_eq!(super::insertion_point(&v, &s, &|&a, &b|{count.set(count.get() + 1); a.cmp(&b)}, Ordering::Less, 0, s.len()), v);
+            assert_eq!(super::insertion_point(&v, &s, &|&a, &b|{count.set(count.get() + 1); usize::cmp(&a, &b).if_equal(Ordering::Less)}, 0, s.len()), v);
             profile.push(count.get());
         }
         assert_eq!(profile, vec![1, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5])
@@ -1048,7 +1060,7 @@ mod tests {
         let mut profile = Vec::new();
         for v in 0 .. s.len() + 1 {
             let count = Cell::new(0);
-            assert_eq!(super::insertion_point(&v, &s, &|&a, &b|{count.set(count.get() + 1); a.cmp(&b)}, Ordering::Less, 0, 1), v);
+            assert_eq!(super::insertion_point(&v, &s, &|&a, &b|{count.set(count.get() + 1); usize::cmp(&a, &b).if_equal(Ordering::Less)}, 0, 1), v);
             profile.push(count.get());
         }
         assert_eq!(profile, vec![1, 2, 4, 4, 6, 6, 6, 6, 8, 8, 8, 8, 8, 8, 8, 8, 6, 6])
@@ -1060,7 +1072,7 @@ mod tests {
         let mut profile = Vec::new();
         for v in 0 .. s.len() + 1 {
             let count = Cell::new(0);
-            assert_eq!(super::insertion_point(&v, &s, &|&a, &b|{count.set(count.get() + 1); a.cmp(&b)}, Ordering::Less, 0, 1), v);
+            assert_eq!(super::insertion_point(&v, &s, &|&a, &b|{count.set(count.get() + 1); usize::cmp(&a, &b).if_equal(Ordering::Less)}, 0, 1), v);
             profile.push(count.get());
         }
         assert_eq!(profile, vec![1, 2, 4, 4, 6, 6, 6, 6, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 7, 7, 7])
@@ -1072,7 +1084,7 @@ mod tests {
         let mut profile = Vec::new();
         for v in 0 .. s.len() + 1 {
             let count = Cell::new(0);
-            assert_eq!(super::insertion_point(&v, &s, &|&a, &b|{count.set(count.get() + 1); a.cmp(&b)}, Ordering::Less, 1, 2), v);
+            assert_eq!(super::insertion_point(&v, &s, &|&a, &b|{count.set(count.get() + 1); usize::cmp(&a, &b).if_equal(Ordering::Less)}, 1, 2), v);
             profile.push(count.get());
         }
         assert_eq!(profile, vec![2, 2, 3, 3, 5, 5, 5, 5, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 6, 6, 6])
@@ -1080,12 +1092,12 @@ mod tests {
 
     #[test]
     fn bisect_unstable() {
-        // If Ordering::Equal passed, then insertion point returned on first match
+        // If compare can return Equal, then insertion point returned on first match
         // Here we pass the length as the initial value, so first test will be in middle.
         // Since that matches the value, it will return immediately.
         let s = [1, 5, 5, 5, 5, 5, 8];
         let count = Cell::new(0);
-        super::insertion_point(&5, &s, &|&a, &b|{count.set(count.get() + 1); a.cmp(&b)}, Ordering::Equal, s.len(), 1);
+        super::insertion_point(&5, &s, &|&a, &b|{count.set(count.get() + 1); i32::cmp(&a, &b)}, s.len(), 1);
         assert_eq!(count.get(), 1);
     }
 
