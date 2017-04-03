@@ -34,9 +34,7 @@ impl IfEqual for Ordering {
     }
 }
 
-fn insertion_point<T, F>(
-    value: &T, buffer: &[T], compare: &F, initial: usize, offset: usize
-) -> usize
+fn insertion_point<T, F>(value: &T, buffer: &[T], compare: &F, initial: usize, offset: usize) -> usize
 where
     F: Fn(&T, &T) -> Ordering
 {
@@ -99,6 +97,16 @@ where
     // lo-hi is a balanced binary tree containing the correct position.  A balanced binary tree
     // contains 2^n - 1 elements.  Perform binary search to find the final insertion position.
     debug_assert!(hi == length || (hi - lo + 1).is_power_of_two());
+    binary_search(value, &buffer[lo .. hi], compare) + lo
+}
+
+fn binary_search<T, F>(value: &T, buffer: &[T], compare: &F) -> usize
+where
+    F: Fn(&T, &T) -> Ordering
+{
+    let length = buffer.len();
+    let mut lo = 0;       // lowest candidate
+    let mut hi = length;  // highest candidate
     while hi > lo {
         let trial = lo + (hi - lo) / 2;
         debug_assert!(trial < length);
@@ -269,27 +277,22 @@ where
         return;
     }
 
-    // R may contain values that are higher than l_max.  These values are already in their final
-    // position, so we can move them from R to S1.
-    let pos = insertion_point(&s[r0 - 1], &s[r0 .. r1], cmpleftright, 0, r1);
-    if pos == 0 {
+    if cmpleftright(&s[r0 - 1], &s[r0]) != Ordering::Greater {
         // l_max < r_0 -> L-R is already sorted
-        //
-        // Although this code is shrinking the size of the sequence and setting up a useful
-        // invariant, it also provides a third behaviour which is useful when this function is
-        // called as part of a mergesort. By passing (initial, offset) = (0, length) it uses the
-        // first comparison to check the value against the first point of the sequence.
         //
         // This means already ordered sequences are merged with one comparison, and an entire
         // mergesort of already ordered data will take the minimum possible (n-1) comparisons.
         // This is useful because much real data is close to already sorted, so optimising this
         // case is valuable.
-        //
-        // Since mergesort typically passes buffers of size 2^n, this means the binary search occurs
-        // over the remaining 2^n-1 values (i.e. is completely balanced).  Hence, this initial test
-        // has no effect on the worst case of log2 n.
         return;
     }
+    // R may contain values that are higher than l_max.  These values are already in their final
+    // position, so we can move them from R to S1.
+    //
+    // Leave out r0, since it was tested above.  Since mergesort typically passes buffers of size
+    // 2^n, this means the binary search occurs over the remaining 2^n-1 values (i.e. is completely
+    // balanced).  Hence, this initial test has no effect on the worst case of log2 n.
+    let pos = binary_search(&s[r0 - 1], &s[r0 + 1 .. r1], cmpleftright) + 1;
     r1 = r0 + pos;
     // l_max is largest value
 
@@ -388,27 +391,22 @@ where
         return;
     }
 
-    // R may contain values that are higher than l_max.  These values are already in their final
-    // position, so we can move them from R to S1.
-    let pos = insertion_point(&s[m0 - 1], &s[r0 .. r1], cmpleftright, 0, r1);
-    if pos == 0 {
+    if cmpleftright(&s[r0 - 1], &s[r0]) != Ordering::Greater {
         // l_max < r_0 -> L-R is already sorted
-        //
-        // Although this code is shrinking the size of the sequence and setting up a useful
-        // invariant, it also provides a third behaviour which is useful when this function is
-        // called as part of a mergesort. By passing (initial, offset) = (0, length) it uses the
-        // first comparison to check the value against the first point of the sequence.
         //
         // This means already ordered sequences are merged with one comparison, and an entire
         // mergesort of already ordered data will take the minimum possible (n-1) comparisons.
         // This is useful because much real data is close to already sorted, so optimising this
         // case is valuable.
-        //
-        // Since mergesort typically passes buffers of size 2^n, this means the binary search occurs
-        // over the remaining 2^n-1 values (i.e. is completely balanced).  Hence, this initial test
-        // has no effect on the worst case of log2 n.
         return;
     }
+    // R may contain values that are higher than l_max.  These values are already in their final
+    // position, so we can move them from R to S1.
+    //
+    // Leave out r0, since it was tested above.  Since mergesort typically passes buffers of size
+    // 2^n, this means the binary search occurs over the remaining 2^n-1 values (i.e. is completely
+    // balanced).  Hence, this initial test has no effect on the worst case of log2 n.
+    let pos = binary_search(&s[r0 - 1], &s[r0 + 1 .. r1], cmpleftright) + 1;
     r1 = r0 + pos;
     // l_max is largest value
 
