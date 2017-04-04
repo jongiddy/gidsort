@@ -19,6 +19,9 @@ const STACK_OBJECT_SIZE: usize = 2048;
 // The maximum GCD for which reverse is used to rotate. Above this value, block swapping is used.
 const ROTATE_REVERSE_MAX: usize = 4;
 
+// The minimum shift used in the insertion merge algorithm
+const INSERTION_MERGE_MIN_SHIFT: usize = 64;
+
 // equivalent to unstable Ordering::then
 trait IfEqual {
     fn if_equal(self, other: Ordering) -> Ordering;
@@ -315,16 +318,10 @@ where
             // all of R is less than L
             break
         }
-        if idx * std::mem::size_of::<T>() > STACK_OBJECT_SIZE {
-            // if there is enough data to fill the stack buffer, shift L right
-            let n = min(llen!(), STACK_OBJECT_SIZE / std::mem::size_of::<T>());
-            debug_assert!(n < idx);
-            rotate_right_shift(&mut s[l0 .. r0 + n], n);
-            l0 += n;
-            r0 += n;
-            idx -= n
-        } else if idx > 64 && llen!() < idx * idx {
+        if idx > INSERTION_MERGE_MIN_SHIFT && llen!() < idx * idx {
             // if idx > sqrt(|L|), shift L right
+            // In theory, this can be done for any size. In practice, the cost of the multiplication
+            // outweighs the benefit for small sequences, so guard this with a minimum size test.
             let n = idx - 1;
             rotate(&mut s[l0 .. r0 + idx - 1], n);
             l0 += n;
