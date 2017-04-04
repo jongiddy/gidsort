@@ -322,7 +322,7 @@ where
 
     let mut idx = 1;
     while llen!() > 1 {
-        idx = insertion_point(&s[l0], &s[r0 + idx .. r1], cmpleftright, 0, r1) + idx;
+        idx = insertion_point(&s[l0], &s[r0 + idx .. r1], cmpleftright, 0, 1) + idx;
         // now R[idx] = first R element with non-zero insertion point in L
         if idx == rlen!() {
             // all of R is less than L
