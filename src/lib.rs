@@ -34,7 +34,7 @@ impl IfEqual for Ordering {
     }
 }
 
-fn insertion_point<T, F>(value: &T, buffer: &[T], compare: &F, initial: usize, offset: usize) -> usize
+fn gallop_right<T, F>(value: &T, buffer: &[T], compare: &F) -> usize
 where
     F: Fn(&T, &T) -> Ordering
 {
@@ -61,23 +61,10 @@ where
     // righthand sequence should be fast.
     //
     // The gallop starts off slow at the start of the sequence, but increases exponentially to find
-    // a range containing the position.  For example, with initial = 0 and offset = 1, the searched
-    // positions are: 0, 1, 3, 7, 15, 31,...
-    //
-    // If the position is more likely to be later in the sequence, the other values can be used.
-    // With initial = 1, offset = 2 the code tests positions: 1, 3, 7, 15, ... using one less
-    // comparison for most values, at the cost of one additional comparison for position 0.
-    //
-    // The offset value must be a power of two and the initial value must be one less than a power
-    // of two, to ensure that the next stage gets a balanced binary tree.
-    //
-    // Setting initial == length will skip the gallop and go straight to binary search.
-    // Setting offset == length will test the initial value and then go to binary search.
-    debug_assert!(initial >= length || (initial + 1).is_power_of_two());
-    debug_assert!(offset >= length || offset.is_power_of_two());
-    let mut p2 = offset;
-    while p2 - offset + initial < length {
-        let trial = p2 - offset + initial;
+    // a range containing the position.  The searched positions are: 0, 1, 3, 7, 15, 31,...
+    let mut p2 = 1;
+    while p2 - 1 < length {
+        let trial = p2 - 1;
         match compare(value, &buffer[trial]) {
             Ordering::Less => {
                 hi = trial;
@@ -299,7 +286,7 @@ where
     // L may contain values that are lower than r_0.  These values are already in their final
     // position, so we can move them from L to S0.  Note, we ignore l_max since we know it is
     // larger than r_0.  This is why we don't need to test whether |L| = 0.
-    let pos = insertion_point(&s[r0], &s[l0 .. r0 - 1], cmprightleft, 0, 1);
+    let pos = gallop_right(&s[r0], &s[l0 .. r0 - 1], cmprightleft);
     l0 += pos;
     // r0 is smallest value
 
@@ -322,7 +309,7 @@ where
 
     let mut idx = 1;
     while llen!() > 1 {
-        idx = insertion_point(&s[l0], &s[r0 + idx .. r1], cmpleftright, 0, 1) + idx;
+        idx = gallop_right(&s[l0], &s[r0 + idx .. r1], cmpleftright) + idx;
         // now R[idx] = first R element with non-zero insertion point in L
         if idx == rlen!() {
             // all of R is less than L
@@ -345,7 +332,7 @@ where
             idx = 1;
         }
         // we know R[idx] > L[0], so exclude it
-        let pos = insertion_point(&s[r0 + idx], &s[l0 + 1 .. r0 - 1], cmprightleft, 0, 1) + 1;
+        let pos = gallop_right(&s[r0 + idx], &s[l0 + 1 .. r0 - 1], cmprightleft) + 1;
         // now R[idx] < L[pos]
         if pos < idx {
             // move lowest values in R to leftmost position in L
@@ -413,7 +400,7 @@ where
     // L may contain values that are lower than r_0.  These values are already in their final
     // position, so we can move them from L to S0.  Note, we ignore l_max since we know it is
     // larger than r_0.  This is why we don't need to test whether |L| = 0.
-    let pos = insertion_point(&s[r0], &s[l0 .. m0 - 1], cmprightleft, 0, 1);
+    let pos = gallop_right(&s[r0], &s[l0 .. m0 - 1], cmprightleft);
     l0 += pos;
     // r0 is smallest value
 
@@ -438,7 +425,7 @@ where
 
     // find X in R where X[i] < L[0]
     // - Since R[0] is minimum, L[0] > R[0], so exclude R[0] from search
-    let mut xlen = insertion_point(&s[l0], &s[r0 + 1 .. r1], cmpleftright, 0, 1) + 1;
+    let mut xlen = gallop_right(&s[l0], &s[r0 + 1 .. r1], cmpleftright) + 1;
     loop {
         debug_assert!(mlen!() == 0);    // |M| == 0
         if xlen == rlen!() {
@@ -453,7 +440,7 @@ where
         // - Since R[r0 + xlen] > L[0] from previous search, exclude L[0] from search
         // - this search relies on invariant |L| > 1, tested in assert
         debug_assert!(l0 + 1 <= m0 - 1);
-        let zlen = insertion_point(&s[r0 + xlen], &s[l0 + 1 .. m0 - 1], cmprightleft, 0, 1) + 1;
+        let zlen = gallop_right(&s[r0 + xlen], &s[l0 + 1 .. m0 - 1], cmprightleft) + 1;
         if llen!() < xlen + zlen {
             // |L| < 2|X| + |Z|:
             // Method E1
@@ -469,7 +456,7 @@ where
                 return;
             }
             debug_assert!(r0 + 1 < r1);
-            xlen = insertion_point(&s[l0], &s[r0 + 1 .. r1], cmpleftright, 0, 1) + 1;
+            xlen = gallop_right(&s[l0], &s[r0 + 1 .. r1], cmpleftright) + 1;
         }
         else {
             // Method E2
@@ -490,7 +477,7 @@ where
             debug_assert!(mlen!() > 0); // |M| > 0
             // find X in R where X[i] < M[0]
             debug_assert!(r0 + 1 < r1);
-            xlen = insertion_point(&s[m0], &s[r0 + 1 .. r1], cmpleftright, 0, 1) + 1;
+            xlen = gallop_right(&s[m0], &s[r0 + 1 .. r1], cmpleftright) + 1;
             loop {
                 if llen!() < xlen {
                     // |L| < |X|:
@@ -511,11 +498,11 @@ where
                     return
                 }
                 // find Y in M where Y[i] < R'[0]
-                let ylen = insertion_point(&s[r0 + xlen], &s[m0 + 1 .. r0], cmprightleft, 0, 1) + 1;
+                let ylen = gallop_right(&s[r0 + xlen], &s[m0 + 1 .. r0], cmprightleft) + 1;
                 if ylen == mlen!() {
                     // |Y| == |M|:
                     // find Z in L where Z[i] < R'[0]
-                    let zlen = insertion_point(&s[r0 + xlen], &s[l0 .. m0 - 1], cmprightleft, 0, 1);
+                    let zlen = gallop_right(&s[r0 + xlen], &s[l0 .. m0 - 1], cmprightleft);
                     // Methods C1 and C3 both start with a rotate of Y - X
                     rotate(&mut s[m0 .. r0 + xlen], xlen);
                     if llen!() < xlen + ylen + zlen {
@@ -534,7 +521,7 @@ where
                         }
                         // find X in R where X[i] < L[0]
                         debug_assert!(r0 + 1 < r1);
-                        xlen = insertion_point(&s[l0], &s[r0 + 1 .. r1], cmpleftright, 0, 1) + 1;
+                        xlen = gallop_right(&s[l0], &s[r0 + 1 .. r1], cmpleftright) + 1;
                         break
                     }
                     // Method C3
@@ -579,7 +566,7 @@ where
                     return;
                 }
                 debug_assert!(r0 + 1 < r1);
-                xlen = insertion_point(&s[m0], &s[r0 + 1 .. r1], cmpleftright, 0, 1) + 1;
+                xlen = gallop_right(&s[m0], &s[r0 + 1 .. r1], cmpleftright) + 1;
             }
         }
     }
@@ -981,121 +968,176 @@ mod tests {
     }
 
     #[test]
-    fn bisect_0() {
-        assert_eq!(super::insertion_point(&Nc(3), &[], &Nc::cmp, 0, 1), 0)
+    fn gallop_right_0() {
+        assert_eq!(super::gallop_right(&Nc(3), &[], &Nc::cmp), 0)
     }
 
     #[test]
-    fn bisect_1_before() {
-        assert_eq!(super::insertion_point(&Nc(1), &[Nc(2)], &Nc::cmp, 0, 1), 0)
+    fn gallop_right_1_before() {
+        assert_eq!(super::gallop_right(&Nc(1), &[Nc(2)], &Nc::cmp), 0)
     }
     #[test]
-    fn bisect_1_after() {
-        assert_eq!(super::insertion_point(&Nc(3), &[Nc(2)], &Nc::cmp, 0, 1), 1)
-    }
-
-    #[test]
-    fn bisect_2_before() {
-        assert_eq!(super::insertion_point(&Nc(1), &[Nc(2), Nc(4)], &Nc::cmp, 0, 1), 0)
-    }
-    #[test]
-    fn bisect_2_middle() {
-        assert_eq!(super::insertion_point(&Nc(3), &[Nc(2), Nc(4)], &Nc::cmp, 0, 1), 1)
-    }
-    #[test]
-    fn bisect_2_after() {
-        assert_eq!(super::insertion_point(&Nc(5), &[Nc(2), Nc(4)], &Nc::cmp, 0, 1), 2)
+    fn gallop_right_1_after() {
+        assert_eq!(super::gallop_right(&Nc(3), &[Nc(2)], &Nc::cmp), 1)
     }
 
     #[test]
-    fn bisect_3_before() {
-        assert_eq!(super::insertion_point(&Nc(1), &[Nc(2), Nc(4), Nc(6)], &Nc::cmp, 0, 1), 0)
+    fn gallop_right_2_before() {
+        assert_eq!(super::gallop_right(&Nc(1), &[Nc(2), Nc(4)], &Nc::cmp), 0)
     }
     #[test]
-    fn bisect_3_lt() {
+    fn gallop_right_2_middle() {
+        assert_eq!(super::gallop_right(&Nc(3), &[Nc(2), Nc(4)], &Nc::cmp), 1)
+    }
+    #[test]
+    fn gallop_right_2_after() {
+        assert_eq!(super::gallop_right(&Nc(5), &[Nc(2), Nc(4)], &Nc::cmp), 2)
+    }
+
+    #[test]
+    fn gallop_right_3_before() {
+        assert_eq!(super::gallop_right(&Nc(1), &[Nc(2), Nc(4), Nc(6)], &Nc::cmp), 0)
+    }
+    #[test]
+    fn gallop_right_3_lt() {
         // Default to Ordering::Less if the value should be inserted before equal values
         let compare = |a: &Nc, b: &Nc|{Nc::cmp(&a, &b).if_equal(Ordering::Less)};
-        assert_eq!(super::insertion_point(&Nc(4), &[Nc(2), Nc(4), Nc(6)], &compare, 0, 1), 1)
+        assert_eq!(super::gallop_right(&Nc(4), &[Nc(2), Nc(4), Nc(6)], &compare), 1)
     }
     #[test]
-    fn bisect_3_le() {
+    fn gallop_right_3_le() {
         // Default to Ordering::Greater if value should be inserted after equal values
         let compare = |a: &Nc, b: &Nc|{Nc::cmp(&a, &b).if_equal(Ordering::Greater)};
-        assert_eq!(super::insertion_point(&Nc(4), &[Nc(2), Nc(4), Nc(6)], &compare, 0, 1), 2)
+        assert_eq!(super::gallop_right(&Nc(4), &[Nc(2), Nc(4), Nc(6)], &compare), 2)
     }
     #[test]
-    fn bisect_3_after() {
-        assert_eq!(super::insertion_point(&Nc(7), &[Nc(2), Nc(4), Nc(6)], &Nc::cmp, 0, 1), 3)
+    fn gallop_right_3_after() {
+        assert_eq!(super::gallop_right(&Nc(7), &[Nc(2), Nc(4), Nc(6)], &Nc::cmp), 3)
     }
 
     #[test]
-    fn bisect_2powm1() {
+    fn gallop_right_2powm1() {
         let s = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14];
         let mut profile = Vec::new();
         for v in 0 .. s.len() + 1 {
             let count = Cell::new(0);
-            assert_eq!(super::insertion_point(&v, &s, &|&a, &b|{count.set(count.get() + 1); usize::cmp(&a, &b).if_equal(Ordering::Less)}, s.len(), 1), v);
+            assert_eq!(super::gallop_right(&v, &s, &|&a, &b|{count.set(count.get() + 1); usize::cmp(&a, &b).if_equal(Ordering::Less)}), v);
             profile.push(count.get());
         }
-        assert_eq!(profile, vec![4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4])
+        assert_eq!(profile, vec![1, 2, 4, 4, 6, 6, 6, 6, 7, 7, 7, 7, 7, 7, 7, 7])
     }
 
     #[test]
-    fn bisect_2pow() {
+    fn gallop_right_2pow() {
         let s = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
         let mut profile = Vec::new();
         for v in 0 .. s.len() + 1 {
             let count = Cell::new(0);
-            assert_eq!(super::insertion_point(&v, &s, &|&a, &b|{count.set(count.get() + 1); usize::cmp(&a, &b).if_equal(Ordering::Less)}, 0, s.len()), v);
+            assert_eq!(super::gallop_right(&v, &s, &|&a, &b|{count.set(count.get() + 1); usize::cmp(&a, &b).if_equal(Ordering::Less)}), v);
             profile.push(count.get());
         }
-        assert_eq!(profile, vec![1, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5])
+        assert_eq!(profile, vec![1, 2, 4, 4, 6, 6, 6, 6, 8, 8, 8, 8, 8, 8, 8, 8, 5])
     }
 
     #[test]
-    fn bisect_2powp1() {
+    fn gallop_right_2powp1() {
         let s = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16];
         let mut profile = Vec::new();
         for v in 0 .. s.len() + 1 {
             let count = Cell::new(0);
-            assert_eq!(super::insertion_point(&v, &s, &|&a, &b|{count.set(count.get() + 1); usize::cmp(&a, &b).if_equal(Ordering::Less)}, 0, 1), v);
+            assert_eq!(super::gallop_right(&v, &s, &|&a, &b|{count.set(count.get() + 1); usize::cmp(&a, &b).if_equal(Ordering::Less)}), v);
             profile.push(count.get());
         }
         assert_eq!(profile, vec![1, 2, 4, 4, 6, 6, 6, 6, 8, 8, 8, 8, 8, 8, 8, 8, 6, 6])
     }
 
     #[test]
-    fn bisect_20_0_1() {
+    fn gallop_right_20() {
         let s = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19];
         let mut profile = Vec::new();
         for v in 0 .. s.len() + 1 {
             let count = Cell::new(0);
-            assert_eq!(super::insertion_point(&v, &s, &|&a, &b|{count.set(count.get() + 1); usize::cmp(&a, &b).if_equal(Ordering::Less)}, 0, 1), v);
+            assert_eq!(super::gallop_right(&v, &s, &|&a, &b|{count.set(count.get() + 1); usize::cmp(&a, &b).if_equal(Ordering::Less)}), v);
             profile.push(count.get());
         }
         assert_eq!(profile, vec![1, 2, 4, 4, 6, 6, 6, 6, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 7, 7, 7])
     }
 
     #[test]
-    fn bisect_20_1_2() {
-        let s = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19];
-        let mut profile = Vec::new();
-        for v in 0 .. s.len() + 1 {
-            let count = Cell::new(0);
-            assert_eq!(super::insertion_point(&v, &s, &|&a, &b|{count.set(count.get() + 1); usize::cmp(&a, &b).if_equal(Ordering::Less)}, 1, 2), v);
-            profile.push(count.get());
-        }
-        assert_eq!(profile, vec![2, 2, 3, 3, 5, 5, 5, 5, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 6, 6, 6])
+    fn binary_search_0() {
+        assert_eq!(super::binary_search(&Nc(3), &[], &Nc::cmp), 0)
     }
 
     #[test]
-    fn bisect_unstable() {
-        // If compare can return Equal, then insertion point returned on first match
-        // Here we pass the length as the initial value, so first test will be in middle.
-        // Since that matches the value, it will return immediately.
+    fn binary_search_1_before() {
+        assert_eq!(super::binary_search(&Nc(1), &[Nc(2)], &Nc::cmp), 0)
+    }
+    #[test]
+    fn binary_search_1_after() {
+        assert_eq!(super::binary_search(&Nc(3), &[Nc(2)], &Nc::cmp), 1)
+    }
+
+    #[test]
+    fn binary_search_2_before() {
+        assert_eq!(super::binary_search(&Nc(1), &[Nc(2), Nc(4)], &Nc::cmp), 0)
+    }
+    #[test]
+    fn binary_search_2_middle() {
+        assert_eq!(super::binary_search(&Nc(3), &[Nc(2), Nc(4)], &Nc::cmp), 1)
+    }
+    #[test]
+    fn binary_search_2_after() {
+        assert_eq!(super::binary_search(&Nc(5), &[Nc(2), Nc(4)], &Nc::cmp), 2)
+    }
+
+    #[test]
+    fn binary_search_3_before() {
+        assert_eq!(super::binary_search(&Nc(1), &[Nc(2), Nc(4), Nc(6)], &Nc::cmp), 0)
+    }
+    #[test]
+    fn binary_search_3_lt() {
+        // Default to Ordering::Less if the value should be inserted before equal values
+        let compare = |a: &Nc, b: &Nc|{Nc::cmp(&a, &b).if_equal(Ordering::Less)};
+        assert_eq!(super::binary_search(&Nc(4), &[Nc(2), Nc(4), Nc(6)], &compare), 1)
+    }
+    #[test]
+    fn binary_search_3_le() {
+        // Default to Ordering::Greater if value should be inserted after equal values
+        let compare = |a: &Nc, b: &Nc|{Nc::cmp(&a, &b).if_equal(Ordering::Greater)};
+        assert_eq!(super::binary_search(&Nc(4), &[Nc(2), Nc(4), Nc(6)], &compare), 2)
+    }
+    #[test]
+    fn binary_search_3_after() {
+        assert_eq!(super::binary_search(&Nc(7), &[Nc(2), Nc(4), Nc(6)], &Nc::cmp), 3)
+    }
+
+    #[test]
+    fn binary_search_2powm1() {
+        let s = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14];
+        let mut profile = Vec::new();
+        for v in 0 .. s.len() + 1 {
+            let count = Cell::new(0);
+            assert_eq!(super::binary_search(&v, &s, &|&a, &b|{count.set(count.get() + 1); usize::cmp(&a, &b).if_equal(Ordering::Less)}), v);
+            profile.push(count.get());
+        }
+        assert_eq!(profile, vec![4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4])
+    }
+
+    #[test]
+    fn binary_search_stable() {
         let s = [1, 5, 5, 5, 5, 5, 8];
         let count = Cell::new(0);
-        super::insertion_point(&5, &s, &|&a, &b|{count.set(count.get() + 1); i32::cmp(&a, &b)}, s.len(), 1);
+        super::binary_search(&5, &s, &|&a, &b|{count.set(count.get() + 1); i32::cmp(&a, &b).if_equal(Ordering::Less)});
+        assert_eq!(count.get(), 3);
+    }
+
+    #[test]
+    fn binary_search_unstable() {
+        // If compare can return Equal, then insertion point returned on first match
+        // Since first comparsion finds matching value, it will return immediately.
+        let s = [1, 5, 5, 5, 5, 5, 8];
+        let count = Cell::new(0);
+        super::binary_search(&5, &s, &|&a, &b|{count.set(count.get() + 1); i32::cmp(&a, &b)});
         assert_eq!(count.get(), 1);
     }
 
