@@ -249,9 +249,8 @@ fn rotate<T>(s: &mut [T], rlen: usize) {
     rotate_gcd(s, rlen);
 }
 
-fn insertion_merge<T, F, G>(
-    s: &mut [T], split: usize, cmpleftright: &F, cmprightleft: &G
-)
+// returns the position after which nothing changed (i.e. final position of Lmax + 1)
+fn insertion_merge<T, F, G>(s: &mut [T], split: usize, cmpleftright: &F, cmprightleft: &G) -> usize
 where
     F: Fn(&T, &T) -> Ordering,
     G: Fn(&T, &T) -> Ordering
@@ -264,7 +263,7 @@ where
     macro_rules! rlen {() => (r1 - r0)}
 
     if llen!() == 0 || rlen!() == 0 {
-        return;
+        return r0;
     }
 
     if cmpleftright(&s[r0 - 1], &s[r0]) != Ordering::Greater {
@@ -274,7 +273,7 @@ where
         // mergesort of already ordered data will take the minimum possible (n-1) comparisons.
         // This is useful because much real data is close to already sorted, so optimising this
         // case is valuable.
-        return;
+        return r0;
     }
     // R may contain values that are higher than l_max.  These values are already in their final
     // position, so we can move them from R to S1.
@@ -297,7 +296,7 @@ where
         // since r_0 is smallest value, if |R| = 1, we just need to swap L and R
         // since l_max is largest value, if |L| = 1, we just need to swap L and R
         rotate(&mut s[l0 .. r1], rlen!());
-        return;
+        return r1;
     }
 
     // At this point, we have several invariants:
@@ -353,6 +352,7 @@ where
     }
     // when |L| == 1, we know that L[max] is greater than all values in R
     rotate(&mut s[l0 .. r1], rlen!());
+    r1
 }
 
 fn merge<T, F, G>(s: &mut [T], split: usize, cmpleftright: &F, cmprightleft: &G)
@@ -438,7 +438,7 @@ where
         // - this search relies on invariant |L| > 1, tested in assert
         debug_assert!(l0 + 1 <= m0 - 1);
         let zlen = gallop_right(&s[r0 + xlen], &s[l0 + 1 .. m0 - 1], cmprightleft) + 1;
-        if llen!() < xlen + zlen {
+        if llen!() <= xlen + zlen {
             // |L| < 2|X| + |Z|:
             // Method E1
             // rotate Z - LX - L' - X to X - Z - LX - L'
@@ -457,7 +457,7 @@ where
         }
         else {
             // Method E2
-            debug_assert!(xlen + zlen <= llen!());
+            debug_assert!(xlen + zlen < llen!());
             // swap L[X] with X
             swap_ends(&mut s[l0 + zlen .. r0 + xlen], xlen);
             // rotate Z - X to X - Z
@@ -472,99 +472,19 @@ where
             }
             // assert |M| > 0 and R[0] is minimum
             debug_assert!(mlen!() > 0); // |M| > 0
-            // find X in R where X[i] < M[0]
-            debug_assert!(r0 + 1 < r1);
-            xlen = gallop_right(&s[m0], &s[r0 + 1 .. r1], cmpleftright) + 1;
-            loop {
-                if llen!() < xlen {
-                    // |L| < |X|:
-                    // rotate(L, M)
-                    rotate(&mut s[l0 .. r0], mlen!());
-                    // merge M-L to L, and X still valid
-                    m0 = r0;
-                    break
-                }
-                if xlen == rlen!() {
-                    // |X| == |R|:
-                    // Method B2
-                    // rotate M - R to R - M
-                    rotate(&mut s[m0 .. r1], rlen!());
-                    // rotate L - R - M to R - M - L
-                    rotate(&mut s[l0 .. r1], mlen!() + rlen!());
-                    // merge completed
-                    return
-                }
-                // find Y in M where Y[i] < R'[0]
-                let ylen = gallop_right(&s[r0 + xlen], &s[m0 + 1 .. r0], cmprightleft) + 1;
-                if ylen == mlen!() {
-                    // |Y| == |M|:
-                    // find Z in L where Z[i] < R'[0]
-                    let zlen = gallop_right(&s[r0 + xlen], &s[l0 .. m0 - 1], cmprightleft);
-                    // Methods C1 and C3 both start with a rotate of Y - X
-                    rotate(&mut s[m0 .. r0 + xlen], xlen);
-                    if llen!() < xlen + ylen + zlen {
-                        // Method C1
-                        // rotate Y - X to X - Y
-                        // rotate Z - LX - LY - L' - X - Y to X - Y - Z - LX - LY - L'
-                        rotate(&mut s[l0 .. r0 + xlen], xlen + ylen);
-                        l0 += xlen + ylen + zlen;
-                        r0 += xlen;
-                        m0 = r0;
-                        if llen!() == 1 || rlen!() == 1 {
-                            // since r_0 is smallest value, if |R| = 1, we just need to swap L and R
-                            // since l_max is largest value, if |L| = 1, we just need to swap L and R
-                            rotate(&mut s[l0 .. r1], rlen!());
-                            return;
-                        }
-                        // find X in R where X[i] < L[0]
-                        debug_assert!(r0 + 1 < r1);
-                        xlen = gallop_right(&s[l0], &s[r0 + 1 .. r1], cmpleftright) + 1;
-                        break
-                    }
-                    // Method C3
-                    debug_assert!(xlen + ylen <= llen!());
-                    // rotate Y - X to X - Y
-                    // rotate Z - LX - LY to LX - LY - Z
-                    rotate(&mut s[l0 .. l0 + zlen + xlen + ylen], xlen + ylen);
-                    // swap LX - LY with X - Y
-                    swap_ends(&mut s[l0 .. r0 + xlen], xlen + ylen);
-                    l0 += xlen + ylen + zlen;
-                    r0 += xlen;
-                } else {
-                    if llen!() < mlen!() + xlen {
-                        // this method works for |L| < |X| + |Y|. However, |M| is a major
-                        // factor in the amount of work done, so we use it instead of |Y|.
-                        // Since |Y| < |M|, we always take the work that A1 can't handle.
-                        // Method A2
-                        debug_assert!(xlen <= llen!());
-                        // swap LX with X
-                        swap_ends(&mut s[l0 .. r0 + xlen], xlen);
-                        // rotate LY - L' - Y to Y - LY - L'
-                        rotate(&mut s[l0 + xlen .. m0 + ylen], ylen);
-                        l0 += xlen + ylen;
-                        m0 += ylen;
-                        r0 += xlen;
-                    } else {
-                        // Method A1
-                        debug_assert!(xlen + ylen <= llen!());
-                        // rotate Y - M' - X to M' - X - Y
-                        rotate(&mut s[m0 .. r0 + xlen], mlen!() - ylen + xlen);
-                        // swap LX - LY with X - Y
-                        swap_ends(&mut s[l0 .. r0 + xlen], xlen + ylen);
-                        l0 += xlen + ylen;
-                        r0 += xlen;
-                    }
-                }
-                debug_assert!(mlen!() > 0); // |M| > 0
-                if rlen!() == 1 {
-                    // since r_0 is smallest value, if |R| = 1, rotate L-M-R to R-M-L
-                    rotate(&mut s[m0 .. r1], rlen!());
-                    rotate(&mut s[l0 .. r1], mlen!() + rlen!());
-                    return;
-                }
-                debug_assert!(r0 + 1 < r1);
-                xlen = gallop_right(&s[m0], &s[r0 + 1 .. r1], cmpleftright) + 1;
+            // insertion merge M into R
+            // TODO - once M is in R, any M that is equal to an L will be sorted out of order
+            let pos = insertion_merge(&mut s[m0 .. r1], mlen!(), cmpleftright, cmprightleft) + m0;
+            debug_assert!(pos <= r1);
+            r0 = m0;
+            if llen!() == 1 || pos == r1 {
+                // since l_max is largest value, if |L| = 1, rotate L-R to R-L
+                // if M[max] inserted at end of R, L > R, rotate L-R to R-L
+                rotate(&mut s[l0 .. r1], rlen!());
+                return;
             }
+            // search for the next insertion point for L[0] in R above M[max]
+            xlen = gallop_right(&s[l0], &s[pos .. r1], cmpleftright) + pos - r0;
         }
     }
 }
@@ -627,7 +547,7 @@ where
         let mut pivot = blk;
         let mut end = 2 * blk;
         while pivot < length {
-            insertion_merge(
+            merge(
                 &mut s[start .. min(end, length)],
                 blk,
                 cmpleftright,

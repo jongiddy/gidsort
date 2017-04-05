@@ -749,11 +749,14 @@ For example, an algorithm for this insertion-merge could be:
 - Swap two values above pos with the highest two values in M, and rotate left two
 - etc.
 
-Alternatively, when we move R<sub>low</sub> to L<sub>low</sub> and open a gap in front of R, open a similar gap at end of R (called B) by moving R<sub>high</sub> values and inserting them into L<sub>high</sub>. Call the sorted L<sub>high</sub> block H.  Move L<sub>low</sub> into B backwards.
-
+> Alternatively, when we move R<sub>low</sub> to L<sub>low</sub> and open a gap in front of R, open a similar gap at end of R (called B) by moving R<sub>high</sub> values and inserting them into L<sub>high</sub>. Call the sorted L<sub>high</sub> block H.  Move L<sub>low</sub> into B backwards.
+>
 So, the gap at the front of R is filled with high values from R, and the gap at end of R is filled with low values from L. Note that |H| >= |B|.
-
-When values from B need to be moved back to L, move elements from end of B to L, move elements from H to B and mark them sorted.
+>
+When values from B need to be moved back to L, move elements from end of B to L, move elements from end of H to end of B and mark them sorted. Move elements from start of B to start of H and insert them into the end of L, expanding H. Finally move the elements taken from L at the beginning into the gap opened up at the start of B.
+>
+Note that this requires H to be shifted, and |H| >= |B|, and B is equivalent to M in Algorithm H.
+So this would seem to perform more shifts than Algorithm H.
 
 To make the insertion-merge algorithm more complete and general:
 
