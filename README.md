@@ -811,8 +811,6 @@ rotate [L,R], R
 return
 ```
 
-So, can we simplify further and just use insertion-merge as the merge step of our algorithm?
-
 While both branches perform a swap and a rotate,
 the second branch rotates elements into their final position,
 while the first branch rotates just to keep the right hand side in order.
@@ -879,3 +877,60 @@ while |L| > 1:
 rotate [L,R], R
 return
 ```
+
+So, can we simplify further and just use insertion-merge as the merge step of our algorithm?
+
+Applying insertion merge (Algorithm I) with no other merge was faster, possibly due to fewer moves.
+
+The original suggestion to keep the original merge, but merge M and R immediately using insertion merge gives Algorithm J:
+
+```
+find X in R where X[i] < L[0]
+loop:
+	assert |M| == 0
+	if |X| == |R|:
+		rotate(L, R)
+		merge completed
+	else:
+		find Z in L where Z[i] < R'[0]
+		if |L| < |X| + |Z|:
+			Method E1
+			find X in R where X[i] < L[0]
+		else:
+			Method E2, creating M
+            insertion_merge(M, R)
+            find X in R where X[i] < L[0]
+```
+
+Given that M is being merged into R, we don't necessarily require that M is calculated the same way.
+We can reduce the number of rotations by swapping X (the part of R that is less than L<sub>0</sub>) with L<sub>X</sub> without trying to find Z.
+
+Algorithm K:
+
+```
+find X in R where X[i] < L[0]
+loop:
+	if |X| == |R|:
+		rotate(L, R)
+		merge completed
+	else:
+		if |L| < |X|:
+			find Z in L where Z[i] < R'[0]
+			rotate(Z-L'-X, X-Z-L')
+			find X in R where X[i] < L[0]
+		else:
+			M = L[..|X|]
+			swap(M, X)
+            insertion_merge(M, R)
+            find X in R where X[i] < L[0]
+```
+
+Whenever a value in M or R is shifted during the insertion merge, it's final position is known, and its next move will be to that position.
+Hence, each element in L gets shifted 3 times (once as part of M moving to front of R, once during merge into R, and once to final position).
+Each element in R gets shifted 2 times (once during merge with M, and once to final position).
+Although, note, there are additional moves within the insertion merge.
+
+A potential problem with this algorithm is that if M<sub>max</sub> == L'<sub>0</sub>, they get split and M<sub>max</sub> gets merged into R.
+Any stable comparison of this M<sub>max</sub> value with L<sub>0</sub> will then get ordered incorrectly.
+This isn't actually a problem as we know that all values in R < M<sub>max</sub> are less than L.
+We should probably express the last two algorithms as inserting R into M, to create M < L<sub>0</sub> and R > L<sub>0</sub>.
