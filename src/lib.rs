@@ -262,26 +262,15 @@ where
     macro_rules! llen {() => (r0 - l0)}
     macro_rules! rlen {() => (r1 - r0)}
 
-    if llen!() == 0 || rlen!() == 0 {
-        return r0;
-    }
+    debug_assert!(llen!() > 0);
+    debug_assert!(rlen!() > 0);
+    debug_assert!(cmpleftright(&s[l0], &s[r0]) == Ordering::Greater);
 
-    if cmpleftright(&s[r0 - 1], &s[r0]) != Ordering::Greater {
-        // l_max < r_0 -> L-R is already sorted
-        //
-        // This means already ordered sequences are merged with one comparison, and an entire
-        // mergesort of already ordered data will take the minimum possible (n-1) comparisons.
-        // This is useful because much real data is close to already sorted, so optimising this
-        // case is valuable.
-        return r0;
-    }
     // R may contain values that are higher than l_max.  These values are already in their final
     // position, so we can move them from R to S1.
     //
-    // Leave out r0, since it was tested above.  Since mergesort typically passes buffers of size
-    // 2^n, this means the binary search occurs over the remaining 2^n-1 values (i.e. is completely
-    // balanced).  Hence, this initial test has no effect on the worst case of log2 n.
-    let pos = binary_search(&s[r0 - 1], &s[r0 + 1 .. r1], cmpleftright) + 1;
+    // Leave out r0, since it is known to be < l0.
+    let pos = gallop_right(&s[r0 - 1], &s[r0 + 1 .. r1], cmpleftright) + 1;
     r1 = r0 + pos;
     // l_max is largest value
 
@@ -783,6 +772,7 @@ mod tests {
     }
 
     #[test]
+    #[should_panic]
     fn insertion_merge_0() {
         let mut s: [i32; 0] = [];
         let count = Cell::new(0);
@@ -792,6 +782,7 @@ mod tests {
     }
 
     #[test]
+    #[should_panic]
     fn insertion_merge_0_1() {
         let mut s = [1];
         let count = Cell::new(0);
@@ -802,6 +793,7 @@ mod tests {
     }
 
     #[test]
+    #[should_panic]
     fn insertion_merge_1_0() {
         let mut s = [1];
         let count = Cell::new(0);
@@ -813,13 +805,14 @@ mod tests {
 
     #[test]
     fn insertion_merge_1_1_ordered() {
-        let mut s = [1, 2];
-        let count = Cell::new(0);
-        let compare = |a: &i32, b: &i32|{count.set(count.get() + 1); i32::cmp(&a, &b)};
-        super::insertion_merge(&mut s, 1, &compare, &compare);
-        assert_eq!(count.get(), 1);
-        assert_eq!(s[0], 1);
-        assert_eq!(s[1], 2);
+        // assume insertion_sort has R[0] < L[0]
+        // let mut s = [1, 2];
+        // let count = Cell::new(0);
+        // let compare = |a: &i32, b: &i32|{count.set(count.get() + 1); i32::cmp(&a, &b)};
+        // super::insertion_merge(&mut s, 1, &compare, &compare);
+        // assert_eq!(count.get(), 1);
+        // assert_eq!(s[0], 1);
+        // assert_eq!(s[1], 2);
     }
 
     #[test]
@@ -828,7 +821,8 @@ mod tests {
         let count = Cell::new(0);
         let compare = |a: &i32, b: &i32|{count.set(count.get() + 1); i32::cmp(&a, &b)};
         super::insertion_merge(&mut s, 1, &compare, &compare);
-        assert_eq!(count.get(), 1);
+        // Zero compares required, but there is a debug_assert that compares once
+        assert!(count.get() <= 1);
         assert_eq!(s[0], 1);
         assert_eq!(s[1], 2);
     }
@@ -847,35 +841,37 @@ mod tests {
 
     #[test]
     fn insertion_merge_n_1() {
-        let mut s = [0, 1, 2, 3, 4, 5, 6, 8, 9, 10, 7];
-        let count = Cell::new(0);
-        let leftlen = s.len() - 1;
-        let compare = |a: &usize, b: &usize|{count.set(count.get() + 1); usize::cmp(&a, &b)};
-        super::insertion_merge(&mut s, leftlen, &compare, &compare);
-        // assert_eq!(count.get(), 5);
-        for (i, elem) in s.iter().enumerate() {
-            assert_eq!(*elem, i);
-        }
+        // assume insertion_sort has R[0] < L[0]
+        // let mut s = [0, 1, 2, 3, 4, 5, 6, 8, 9, 10, 7];
+        // let count = Cell::new(0);
+        // let leftlen = s.len() - 1;
+        // let compare = |a: &usize, b: &usize|{count.set(count.get() + 1); usize::cmp(&a, &b)};
+        // super::insertion_merge(&mut s, leftlen, &compare, &compare);
+        // // assert_eq!(count.get(), 5);
+        // for (i, elem) in s.iter().enumerate() {
+        //     assert_eq!(*elem, i);
+        // }
     }
 
     #[test]
     fn insertion_merge_ordered() {
-        let mut s = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
-        let count = Cell::new(0);
-        let leftlen = s.len() / 2;
-        let compare = |a: &usize, b: &usize|{count.set(count.get() + 1); usize::cmp(&a, &b)};
-        super::insertion_merge(&mut s, leftlen, &compare, &compare);
-        assert_eq!(count.get(), 1);
-        for (i, elem) in s.iter().enumerate() {
-            assert_eq!(*elem, i);
-        }
+        // assume insertion_sort has R[0] < L[0]
+        // let mut s = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
+        // let count = Cell::new(0);
+        // let leftlen = s.len() / 2;
+        // let compare = |a: &usize, b: &usize|{count.set(count.get() + 1); usize::cmp(&a, &b)};
+        // super::insertion_merge(&mut s, leftlen, &compare, &compare);
+        // assert_eq!(count.get(), 1);
+        // for (i, elem) in s.iter().enumerate() {
+        //     assert_eq!(*elem, i);
+        // }
     }
 
     #[test]
     fn insertion_merge_alternative() {
         let mut s = [
+            Nc(1), Nc(3), Nc(5), Nc(7), Nc(9), Nc(11), Nc(13), Nc(15),
             Nc(0), Nc(2), Nc(4), Nc(6), Nc(8), Nc(10), Nc(12), Nc(14),
-            Nc(1), Nc(3), Nc(5), Nc(7), Nc(9), Nc(11), Nc(13), Nc(15)
         ];
         let leftlen = s.len() / 2;
         super::insertion_merge(&mut s, leftlen, &Nc::cmp, &Nc::cmp);
