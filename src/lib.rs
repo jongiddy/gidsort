@@ -462,7 +462,10 @@ where
             // assert |M| > 0 and R[0] is minimum
             debug_assert!(mlen!() > 0); // |M| > 0
             // insertion merge M into R
-            // TODO - once M is in R, any M that is equal to an L will be sorted out of order
+            // Once M is in R, any M that is equal to an L will be sorted out of order.  This is
+            // not a problem as long as M is selected as being <(=) R'[0], since M[max] <= L[0] but
+            // M[max] == L[0] only if both == R'[0].  In a stable sort, this cannot happen, and in
+            // an unstable sort, it doesn't matter if it does.
             let pos = insertion_merge(&mut s[m0 .. r1], mlen!(), cmpleftright, cmprightleft) + m0;
             debug_assert!(pos <= r1);
             r0 = m0;
