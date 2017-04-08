@@ -249,54 +249,57 @@ fn rotate<T>(s: &mut [T], rlen: usize) {
     rotate_gcd(s, rlen);
 }
 
-// returns the position after which nothing changed (i.e. final position of Lmax + 1)
-fn insertion_merge<T, F, G>(s: &mut [T], split: usize, cmpleftright: &F, cmprightleft: &G) -> usize
+fn insertion_merge<T, F, G>(s: &mut [T], split: usize, cmpleftright: &F, cmprightleft: &G)
+where
+    F: Fn(&T, &T) -> Ordering,
+    G: Fn(&T, &T) -> Ordering
+{
+    let r0 = split;
+    let len = s.len();
+
+    macro_rules! llen {() => (split)}
+    macro_rules! rlen {() => (len - split)}
+    macro_rules! lmax {() => (split - 1)}
+
+    if llen!() == 0 || rlen!() == 0 {
+        return;
+    }
+
+    // Trim off in-position high values of R to leave l[max] as largest value
+    if cmpleftright(&s[lmax!()], &s[r0]) != Ordering::Greater {
+        // l[max] <(=) r[0] -> L-R is already sorted
+        return;
+    }
+    // Leave out r[0], since it is known to be < l[max].
+    let r1 = binary_search(&s[lmax!()], &s[r0 + 1 .. len], cmpleftright) + r0 + 1;
+
+    // Trim off in-position low values of L to leave r[max] as smallest value
+    // Leave out l[max] since it is known to be > r[0].
+    let l0 = gallop_right(&s[r0], &s[.. split - 1], cmprightleft);
+
+    insertion_merge_lmax_rmin(&mut s[l0 .. r1], split - l0, cmpleftright, cmprightleft);
+}
+
+fn insertion_merge_lmax_rmin<T, F, G>(s: &mut [T], split: usize, cmpleftright: &F, cmprightleft: &G)
 where
     F: Fn(&T, &T) -> Ordering,
     G: Fn(&T, &T) -> Ordering
 {
     let mut l0 = 0;
     let mut r0 = split;
-    let mut r1 = s.len();
+    let r1 = s.len();
 
     macro_rules! llen {() => (r0 - l0)}
     macro_rules! rlen {() => (r1 - r0)}
 
+    // 1. |L| > 0
     debug_assert!(llen!() > 0);
+    // 2. |R| > 0
     debug_assert!(rlen!() > 0);
-    debug_assert!(cmpleftright(&s[l0], &s[r0]) == Ordering::Greater);
-
-    // R may contain values that are higher than l_max.  These values are already in their final
-    // position, so we can move them from R to S1.
-    //
-    // Leave out r0, since it is known to be < l0.
-    let pos = gallop_right(&s[r0 - 1], &s[r0 + 1 .. r1], cmpleftright) + 1;
-    r1 = r0 + pos;
-    // l_max is largest value
-
-    // L may contain values that are lower than r_0.  These values are already in their final
-    // position, so we can move them from L to S0.  Note, we ignore l_max since we know it is
-    // larger than r_0.  This is why we don't need to test whether |L| = 0.
-    let pos = gallop_right(&s[r0], &s[l0 .. r0 - 1], cmprightleft);
-    l0 += pos;
-    // r0 is smallest value
-
-    if llen!() == 1 || rlen!() == 1 {
-        // since r_0 is smallest value, if |R| = 1, we just need to swap L and R
-        // since l_max is largest value, if |L| = 1, we just need to swap L and R
-        rotate(&mut s[l0 .. r1], rlen!());
-        return r1;
-    }
-
-    // At this point, we have several invariants:
-    // 1. r_0 is min value
-    debug_assert!(cmpleftright(&s[l0], &s[r0]) != Ordering::Less);
-    // 2. l_max is max value
+    // 3. l_max is max value
     debug_assert!(cmprightleft(&s[r1 - 1], &s[r0 - 1]) != Ordering::Greater);
-    // 3. |L| > 1
-    debug_assert!(llen!() > 1);
-    // 4. |R| > 1
-    debug_assert!(rlen!() > 1);
+    // 4. r_0 is min value
+    debug_assert!(cmpleftright(&s[l0], &s[r0]) != Ordering::Less);
 
     let mut idx = 1;
     while llen!() > 1 {
@@ -339,9 +342,10 @@ where
         // R[idx] is the next lowest value and is less than L[0] (was L[pos])
         idx += 1
     }
-    // when |L| == 1, we know that L[max] is greater than all values in R
+    // when we get here, we know that all values in L are greater than all values in R,
+    // either because |L| == 1, and we know that L[max] is greater than all values in R,
+    // or we just found that L[0] is greater than all values in R
     rotate(&mut s[l0 .. r1], rlen!());
-    r1
 }
 
 fn merge<T, F, G>(s: &mut [T], split: usize, cmpleftright: &F, cmprightleft: &G)
@@ -453,21 +457,25 @@ where
             rotate(&mut s[l0 .. l0 + zlen + xlen], xlen);
             l0 += xlen + zlen;
             r0 += xlen;
+            // |M| > 0 and R[0] is minimum
+            debug_assert!(mlen!() > 0); // |M| > 0
+            debug_assert!(cmpleftright(&s[m0], &s[r0]) != Ordering::Less);
             if rlen!() == 1 {
                 // since r_0 is smallest value, if |R| = 1, rotate L-M-R to R-M-L
                 rotate(&mut s[m0 .. r1], rlen!());
                 rotate(&mut s[l0 .. r1], mlen!() + rlen!());
                 return;
             }
-            // assert |M| > 0 and R[0] is minimum
-            debug_assert!(mlen!() > 0); // |M| > 0
             // insertion merge M into R
             // Once M is in R, any M that is equal to an L will be sorted out of order.  This is
             // not a problem as long as M is selected as being <(=) R'[0], since M[max] <= L[0] but
             // M[max] == L[0] only if both == R'[0].  In a stable sort, this cannot happen, and in
             // an unstable sort, it doesn't matter if it does.
-            let pos = insertion_merge(&mut s[m0 .. r1], mlen!(), cmpleftright, cmprightleft) + m0;
-            debug_assert!(pos <= r1);
+            // M[max] > R[0]
+            debug_assert!(cmpleftright(&s[r0 - 1], &s[r0]) != Ordering::Less);
+            // Find the first position in R > M[max]
+            let pos = gallop_right(&s[r0 - 1], &s[r0 + 1 .. r1], cmpleftright) + r0 + 1;
+            insertion_merge_lmax_rmin(&mut s[m0 .. pos], mlen!(), cmpleftright, cmprightleft);
             r0 = m0;
             if llen!() == 1 || pos == r1 {
                 // since l_max is largest value, if |L| = 1, rotate L-R to R-L
@@ -775,7 +783,6 @@ mod tests {
     }
 
     #[test]
-    #[should_panic]
     fn insertion_merge_0() {
         let mut s: [i32; 0] = [];
         let count = Cell::new(0);
@@ -785,7 +792,6 @@ mod tests {
     }
 
     #[test]
-    #[should_panic]
     fn insertion_merge_0_1() {
         let mut s = [1];
         let count = Cell::new(0);
@@ -796,7 +802,6 @@ mod tests {
     }
 
     #[test]
-    #[should_panic]
     fn insertion_merge_1_0() {
         let mut s = [1];
         let count = Cell::new(0);
@@ -808,14 +813,13 @@ mod tests {
 
     #[test]
     fn insertion_merge_1_1_ordered() {
-        // assume insertion_sort has R[0] < L[0]
-        // let mut s = [1, 2];
-        // let count = Cell::new(0);
-        // let compare = |a: &i32, b: &i32|{count.set(count.get() + 1); i32::cmp(&a, &b)};
-        // super::insertion_merge(&mut s, 1, &compare, &compare);
-        // assert_eq!(count.get(), 1);
-        // assert_eq!(s[0], 1);
-        // assert_eq!(s[1], 2);
+        let mut s = [1, 2];
+        let count = Cell::new(0);
+        let compare = |a: &i32, b: &i32|{count.set(count.get() + 1); i32::cmp(&a, &b)};
+        super::insertion_merge(&mut s, 1, &compare, &compare);
+        assert_eq!(count.get(), 1);
+        assert_eq!(s[0], 1);
+        assert_eq!(s[1], 2);
     }
 
     #[test]
@@ -824,8 +828,8 @@ mod tests {
         let count = Cell::new(0);
         let compare = |a: &i32, b: &i32|{count.set(count.get() + 1); i32::cmp(&a, &b)};
         super::insertion_merge(&mut s, 1, &compare, &compare);
-        // Zero compares required, but there is a debug_assert that compares once
-        assert!(count.get() <= 1);
+        // One compare required, but there are 2 debug_assert that compare
+        assert!(count.get() <= 3);
         assert_eq!(s[0], 1);
         assert_eq!(s[1], 2);
     }
@@ -844,30 +848,25 @@ mod tests {
 
     #[test]
     fn insertion_merge_n_1() {
-        // assume insertion_sort has R[0] < L[0]
-        // let mut s = [0, 1, 2, 3, 4, 5, 6, 8, 9, 10, 7];
-        // let count = Cell::new(0);
-        // let leftlen = s.len() - 1;
-        // let compare = |a: &usize, b: &usize|{count.set(count.get() + 1); usize::cmp(&a, &b)};
-        // super::insertion_merge(&mut s, leftlen, &compare, &compare);
-        // // assert_eq!(count.get(), 5);
-        // for (i, elem) in s.iter().enumerate() {
-        //     assert_eq!(*elem, i);
-        // }
+        let mut s = [0, 1, 2, 3, 4, 5, 6, 8, 9, 10, 7];
+        let leftlen = s.len() - 1;
+        super::insertion_merge(&mut s, leftlen, &usize::cmp, &usize::cmp);
+        for (i, elem) in s.iter().enumerate() {
+            assert_eq!(*elem, i);
+        }
     }
 
     #[test]
     fn insertion_merge_ordered() {
-        // assume insertion_sort has R[0] < L[0]
-        // let mut s = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
-        // let count = Cell::new(0);
-        // let leftlen = s.len() / 2;
-        // let compare = |a: &usize, b: &usize|{count.set(count.get() + 1); usize::cmp(&a, &b)};
-        // super::insertion_merge(&mut s, leftlen, &compare, &compare);
-        // assert_eq!(count.get(), 1);
-        // for (i, elem) in s.iter().enumerate() {
-        //     assert_eq!(*elem, i);
-        // }
+        let mut s = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
+        let count = Cell::new(0);
+        let leftlen = s.len() / 2;
+        let compare = |a: &usize, b: &usize|{count.set(count.get() + 1); usize::cmp(&a, &b)};
+        super::insertion_merge(&mut s, leftlen, &compare, &compare);
+        assert_eq!(count.get(), 1);
+        for (i, elem) in s.iter().enumerate() {
+            assert_eq!(*elem, i);
+        }
     }
 
     #[test]
