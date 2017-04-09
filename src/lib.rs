@@ -249,38 +249,65 @@ fn rotate<T>(s: &mut [T], rlen: usize) {
     rotate_gcd(s, rlen);
 }
 
+
+fn trim<T, F, G>(s: &[T], split: usize, cmpleftright: &F, cmprightleft: &G) -> Option<(usize, usize)>
+where
+    F: Fn(&T, &T) -> Ordering,
+    G: Fn(&T, &T) -> Ordering
+{
+    // Trim the low elements in L and high elements in R that are in their final position.
+    //
+    // Trimming is done in a specific order.  First l[max] is compared against r[0].  This ensures
+    // that sequences that are in order use one comparison.   Much real data is close to already
+    // sorted, so optimising this case is valuable.
+    //
+    // Then, a binary search of the l[max] over the remaining R is done, as any values in R that are
+    // higher than l[max] are already in their final position, and can be ignored.  In a typical
+    // mergesort, the two sequences will each have length 2^n, and the first step means we search one
+    // less = 2^n - 1.  This is the optimal size for binary search, as it means the search must take
+    // log2 n comparisons.
+    //
+    // Finally, we check for values in L that are less than r[0], as they are also in their final
+    // position.  In this case, we gallop right, since we expect r[0] to be lower than the average
+    // value in L.
+    let r0 = split;
+    let slen = s.len();
+    let llen = split;
+    let rlen = slen - split;
+
+    macro_rules! lmax {() => (split - 1)}
+
+    if llen == 0 || rlen == 0 {
+        return None;
+    }
+
+    // Check if sequences are already in order
+    if cmpleftright(&s[lmax!()], &s[r0]) != Ordering::Greater {
+        // l[max] <= r[0] -> L-R is already sorted
+        return None;
+    }
+    // Trim off in-position high values of R to leave l[max] as largest value
+    // From above, r[0] <= l[max], so exclude r[0] from search.
+    let r1 = binary_search(&s[lmax!()], &s[r0 + 1 .. slen], cmpleftright) + r0 + 1;
+
+    // Trim off in-position low values of L to leave r[max] as smallest value
+    // From above, l[max] >= r[0], so exclude l[max] from search.
+    let l0 = gallop_right(&s[r0], &s[.. split - 1], cmprightleft);
+
+    Some((l0, r1))
+}
+
 fn insertion_merge<T, F, G>(s: &mut [T], split: usize, cmpleftright: &F, cmprightleft: &G)
 where
     F: Fn(&T, &T) -> Ordering,
     G: Fn(&T, &T) -> Ordering
 {
-    let r0 = split;
-    let len = s.len();
-
-    macro_rules! llen {() => (split)}
-    macro_rules! rlen {() => (len - split)}
-    macro_rules! lmax {() => (split - 1)}
-
-    if llen!() == 0 || rlen!() == 0 {
-        return;
+    if let Some((l0, r1)) = trim(s, split, cmpleftright, cmprightleft) {
+        insertion_merge_trimmed(&mut s[l0 .. r1], split - l0, cmpleftright, cmprightleft);
     }
-
-    // Trim off in-position high values of R to leave l[max] as largest value
-    if cmpleftright(&s[lmax!()], &s[r0]) != Ordering::Greater {
-        // l[max] <(=) r[0] -> L-R is already sorted
-        return;
-    }
-    // Leave out r[0], since it is known to be < l[max].
-    let r1 = binary_search(&s[lmax!()], &s[r0 + 1 .. len], cmpleftright) + r0 + 1;
-
-    // Trim off in-position low values of L to leave r[max] as smallest value
-    // Leave out l[max] since it is known to be > r[0].
-    let l0 = gallop_right(&s[r0], &s[.. split - 1], cmprightleft);
-
-    insertion_merge_lmax_rmin(&mut s[l0 .. r1], split - l0, cmpleftright, cmprightleft);
 }
 
-fn insertion_merge_lmax_rmin<T, F, G>(s: &mut [T], split: usize, cmpleftright: &F, cmprightleft: &G)
+fn insertion_merge_trimmed<T, F, G>(s: &mut [T], split: usize, cmpleftright: &F, cmprightleft: &G)
 where
     F: Fn(&T, &T) -> Ordering,
     G: Fn(&T, &T) -> Ordering
@@ -353,46 +380,37 @@ where
     F: Fn(&T, &T) -> Ordering,
     G: Fn(&T, &T) -> Ordering
 {
+    if let Some((l0, r1)) = trim(s, split, cmpleftright, cmprightleft) {
+        merge_trimmed(&mut s[l0 .. r1], split - l0, cmpleftright, cmprightleft);
+    }
+}
+
+fn merge_trimmed<T, F, G>(s: &mut [T], split: usize, cmpleftright: &F, cmprightleft: &G)
+where
+    F: Fn(&T, &T) -> Ordering,
+    G: Fn(&T, &T) -> Ordering
+{
     // The slice to be sorted is divided into S0 | L | M | R | S1
     // The indexes into the slice are l0, m0, r0, r1
     let mut l0 = 0;
     let mut m0 = split;
     let mut r0 = split;
-    let mut r1 = s.len();
+    let r1 = s.len();
 
     macro_rules! llen {() => (m0 - l0)}
     macro_rules! mlen {() => (r0 - m0)}
     macro_rules! rlen {() => (r1 - r0)}
 
-    if llen!() == 0 || rlen!() == 0 {
-        return;
-    }
-
-    if cmpleftright(&s[r0 - 1], &s[r0]) != Ordering::Greater {
-        // l_max < r_0 -> L-R is already sorted
-        //
-        // This means already ordered sequences are merged with one comparison, and an entire
-        // mergesort of already ordered data will take the minimum possible (n-1) comparisons.
-        // This is useful because much real data is close to already sorted, so optimising this
-        // case is valuable.
-        return;
-    }
-    // R may contain values that are higher than l_max.  These values are already in their final
-    // position, so we can move them from R to S1.
-    //
-    // Leave out r0, since it was tested above.  Since mergesort typically passes buffers of size
-    // 2^n, this means the binary search occurs over the remaining 2^n-1 values (i.e. is completely
-    // balanced).  Hence, this initial test has no effect on the worst case of log2 n.
-    let pos = binary_search(&s[r0 - 1], &s[r0 + 1 .. r1], cmpleftright) + 1;
-    r1 = r0 + pos;
-    // l_max is largest value
-
-    // L may contain values that are lower than r_0.  These values are already in their final
-    // position, so we can move them from L to S0.  Note, we ignore l_max since we know it is
-    // larger than r_0.  This is why we don't need to test whether |L| = 0.
-    let pos = gallop_right(&s[r0], &s[l0 .. m0 - 1], cmprightleft);
-    l0 += pos;
-    // r0 is smallest value
+    // 1. |L| > 0
+    debug_assert!(llen!() > 0);
+    // 2. |M| == 0
+    debug_assert!(mlen!() == 0);
+    // 3. |R| > 0
+    debug_assert!(rlen!() > 0);
+    // 4. l_max is max value
+    debug_assert!(cmprightleft(&s[r1 - 1], &s[r0 - 1]) != Ordering::Greater);
+    // 5. r_0 is min value
+    debug_assert!(cmpleftright(&s[l0], &s[r0]) != Ordering::Less);
 
     if llen!() == 1 || rlen!() == 1 {
         // since r_0 is smallest value, if |R| = 1, we just need to swap L and R
@@ -400,18 +418,6 @@ where
         rotate(&mut s[l0 .. r1], rlen!());
         return;
     }
-
-    // At this point, we have several invariants:
-    // 1. r_0 is min value
-    debug_assert!(cmpleftright(&s[l0], &s[r0]) != Ordering::Less);
-    // 2. l_max is max value
-    debug_assert!(cmprightleft(&s[r1 - 1], &s[m0 - 1]) != Ordering::Greater);
-    // 3. |L| > 1
-    debug_assert!(llen!() > 1);
-    // 4. |M| == 0
-    debug_assert!(mlen!() == 0);
-    // 5. |R| > 1
-    debug_assert!(rlen!() > 1);
 
     // find X in R where X[i] < L[0]
     // - Since R[0] is minimum, L[0] > R[0], so exclude R[0] from search
@@ -475,7 +481,7 @@ where
             debug_assert!(cmpleftright(&s[r0 - 1], &s[r0]) != Ordering::Less);
             // Find the first position in R > M[max]
             let pos = gallop_right(&s[r0 - 1], &s[r0 + 1 .. r1], cmpleftright) + r0 + 1;
-            insertion_merge_lmax_rmin(&mut s[m0 .. pos], mlen!(), cmpleftright, cmprightleft);
+            insertion_merge_trimmed(&mut s[m0 .. pos], mlen!(), cmpleftright, cmprightleft);
             r0 = m0;
             if llen!() == 1 || pos == r1 {
                 // since l_max is largest value, if |L| = 1, rotate L-R to R-L
@@ -726,7 +732,8 @@ mod tests {
         let count = Cell::new(0);
         let compare = |a: &i32, b: &i32|{count.set(count.get() + 1); i32::cmp(&a, &b)};
         super::merge(&mut s, 1, &compare, &compare);
-        assert_eq!(count.get(), 1);
+        // One compare required, but there are 2 debug_assert that compare
+        assert!(count.get() <= 3);
         assert_eq!(s[0], 1);
         assert_eq!(s[1], 2);
     }
