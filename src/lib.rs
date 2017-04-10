@@ -1,6 +1,5 @@
 extern crate gcd;
 
-use std::cmp::min;
 use std::cmp::Ordering;
 
 use gcd::Gcd;
@@ -550,18 +549,25 @@ where
     let mut blk = 4;  // size of blocks already sorted
     while blk < length {
         let mut start = 0;
-        let mut pivot = blk;
         let mut end = 2 * blk;
-        while pivot < length {
+        while end < length {
             merge(
-                &mut s[start .. min(end, length)],
+                &mut s[start .. end],
                 blk,
                 cmpleftright,
                 cmprightleft
             );
             start = end;
-            pivot = start + blk;
-            end = pivot + blk;
+            end += 2 * blk;
+        }
+        // for tail, if right side contains at least one element, perform an additional merge
+        if start + blk < length {
+            merge(
+                &mut s[start .. length],
+                blk,
+                cmpleftright,
+                cmprightleft
+            );
         }
         blk *= 2;
     }
