@@ -269,31 +269,28 @@ where
     // Finally, we check for values in L that are less than r[0], as they are also in their final
     // position.  In this case, we gallop right, since we expect r[0] to be lower than the average
     // value in L.
-    let r0 = split;
     let slen = s.len();
     let llen = split;
     let rlen = slen - split;
-
-    macro_rules! lmax {() => (split - 1)}
 
     if llen == 0 || rlen == 0 {
         return None;
     }
 
     // Check if sequences are already in order
-    if cmpleftright(&s[lmax!()], &s[r0]) != Ordering::Greater {
+    if cmpleftright(&s[split - 1], &s[split]) != Ordering::Greater {
         // l[max] <= r[0] -> L-R is already sorted
         return None;
     }
     // Trim off in-position high values of R to leave l[max] as largest value
     // From above, r[0] <= l[max], so exclude r[0] from search.
-    let r1 = binary_search(&s[lmax!()], &s[r0 + 1 .. slen], cmpleftright) + r0 + 1;
+    let right = binary_search(&s[split - 1], &s[split + 1 .. slen], cmpleftright) + split + 1;
 
     // Trim off in-position low values of L to leave r[max] as smallest value
     // From above, l[max] >= r[0], so exclude l[max] from search.
-    let l0 = gallop_right(&s[r0], &s[.. split - 1], cmprightleft);
+    let left = gallop_right(&s[split], &s[.. split - 1], cmprightleft);
 
-    Some((l0, r1))
+    Some((left, right))
 }
 
 fn insertion_merge<T, F, G>(s: &mut [T], split: usize, cmpleftright: &F, cmprightleft: &G)
@@ -301,8 +298,8 @@ where
     F: Fn(&T, &T) -> Ordering,
     G: Fn(&T, &T) -> Ordering
 {
-    if let Some((l0, r1)) = trim(s, split, cmpleftright, cmprightleft) {
-        insertion_merge_trimmed(&mut s[l0 .. r1], split - l0, cmpleftright, cmprightleft);
+    if let Some((left, right)) = trim(s, split, cmpleftright, cmprightleft) {
+        insertion_merge_trimmed(&mut s[left .. right], split - left, cmpleftright, cmprightleft);
     }
 }
 
@@ -311,25 +308,25 @@ where
     F: Fn(&T, &T) -> Ordering,
     G: Fn(&T, &T) -> Ordering
 {
-    let mut l0 = 0;
-    let mut r0 = split;
-    let r1 = s.len();
+    let mut left = 0;
+    let mut split = split;
+    let right = s.len();
 
-    macro_rules! llen {() => (r0 - l0)}
-    macro_rules! rlen {() => (r1 - r0)}
+    macro_rules! llen {() => (split - left)}
+    macro_rules! rlen {() => (right - split)}
 
     // 1. |L| > 0
     debug_assert!(llen!() > 0);
     // 2. |R| > 0
     debug_assert!(rlen!() > 0);
     // 3. l_max is max value
-    debug_assert!(cmprightleft(&s[r1 - 1], &s[r0 - 1]) != Ordering::Greater);
+    debug_assert!(cmprightleft(&s[right - 1], &s[split - 1]) != Ordering::Greater);
     // 4. r_0 is min value
-    debug_assert!(cmpleftright(&s[l0], &s[r0]) != Ordering::Less);
+    debug_assert!(cmpleftright(&s[left], &s[split]) != Ordering::Less);
 
     let mut idx = 1;
     while llen!() > 1 {
-        idx = gallop_right(&s[l0], &s[r0 + idx .. r1], cmpleftright) + idx;
+        idx = gallop_right(&s[left], &s[split + idx .. right], cmpleftright) + idx;
         // now R[idx] = first R element with non-zero insertion point in L
         if idx == rlen!() {
             // all of R is less than L
@@ -340,30 +337,30 @@ where
             // In theory, this can be done for any size. In practice, the cost of the multiplication
             // outweighs the benefit for small sequences, so guard this with a minimum size test.
             let n = idx - 1;
-            rotate(&mut s[l0 .. r0 + idx - 1], n);
-            l0 += n;
-            r0 += n;
+            rotate(&mut s[left .. split + idx - 1], n);
+            left += n;
+            split += n;
             idx = 1;
         }
         // we know R[idx] > L[0], so exclude it
-        let pos = gallop_right(&s[r0 + idx], &s[l0 + 1 .. r0 - 1], cmprightleft) + 1;
+        let pos = gallop_right(&s[split + idx], &s[left + 1 .. split - 1], cmprightleft) + 1;
         // now R[idx] < L[pos]
         if pos < idx {
             // move lowest values in R to leftmost position in L
-            swap_ends(&mut s[l0 .. r0 + pos], pos);
+            swap_ends(&mut s[left .. split + pos], pos);
             // the new R[..pos] are > R[idx - 1] but < R[idx]
-            rotate(&mut s[r0 .. r0 + idx], idx - pos);
+            rotate(&mut s[split .. split + idx], idx - pos);
         } else {
             // move the highest values in L[..pos] out of the way to allow us to
             // shift the lowest values from R to front of sequence.  Do this by
             // swapping the high L values and the low R values, then rotating the
             // low L values into their final position.
-            swap_ends(&mut s[l0 + pos - idx .. r0 + idx], idx);
-            rotate(&mut s[l0 .. l0 + pos], idx);
+            swap_ends(&mut s[left + pos - idx .. split + idx], idx);
+            rotate(&mut s[left .. left + pos], idx);
         }
         // L[.. pos] are now the lowest values in correct position:
         // add them to sorted by trimming L
-        l0 += pos;
+        left += pos;
         // the highest values moved to R are still < R[idx] and in fact
         // R[idx] is the next lowest value and is less than L[0] (was L[pos])
         idx += 1
@@ -371,7 +368,7 @@ where
     // when we get here, we know that all values in L are greater than all values in R,
     // either because |L| == 1, and we know that L[max] is greater than all values in R,
     // or we just found that L[0] is greater than all values in R
-    rotate(&mut s[l0 .. r1], rlen!());
+    rotate(&mut s[left .. right], rlen!());
 }
 
 fn merge<T, F, G>(s: &mut [T], split: usize, cmpleftright: &F, cmprightleft: &G)
@@ -379,8 +376,8 @@ where
     F: Fn(&T, &T) -> Ordering,
     G: Fn(&T, &T) -> Ordering
 {
-    if let Some((l0, r1)) = trim(s, split, cmpleftright, cmprightleft) {
-        merge_trimmed(&mut s[l0 .. r1], split - l0, cmpleftright, cmprightleft);
+    if let Some((left, right)) = trim(s, split, cmpleftright, cmprightleft) {
+        merge_trimmed(&mut s[left .. right], split - left, cmpleftright, cmprightleft);
     }
 }
 
