@@ -63,8 +63,8 @@ where
     // righthand sequence should be fast.
     //
     // The gallop starts off slow at the start of the sequence, but increases exponentially to find
-    // a range containing the position.  The searched positions are: 0, 1, 3, 7, 15, 31,...
-    let mut p2 = 1;
+    // a range containing the position.  The searched positions are: 1, 3, 7, 15, 31,...
+    let mut p2 = 2;
     while p2 - 1 < length {
         let trial = p2 - 1;
         match compare(value, &buffer[trial]) {
@@ -966,7 +966,7 @@ mod tests {
             assert_eq!(super::gallop_right(&v, &s, &|&a, &b|{count.set(count.get() + 1); usize::cmp(&a, &b).if_equal(Ordering::Less)}), v);
             profile.push(count.get());
         }
-        assert_eq!(profile, vec![1, 2, 4, 4, 6, 6, 6, 6, 7, 7, 7, 7, 7, 7, 7, 7])
+        assert_eq!(profile, vec![2, 2, 3, 3, 5, 5, 5, 5, 6, 6, 6, 6, 6, 6, 6, 6])
     }
 
     #[test]
@@ -978,7 +978,7 @@ mod tests {
             assert_eq!(super::gallop_right(&v, &s, &|&a, &b|{count.set(count.get() + 1); usize::cmp(&a, &b).if_equal(Ordering::Less)}), v);
             profile.push(count.get());
         }
-        assert_eq!(profile, vec![1, 2, 4, 4, 6, 6, 6, 6, 8, 8, 8, 8, 8, 8, 8, 8, 5])
+        assert_eq!(profile, vec![2, 2, 3, 3, 5, 5, 5, 5, 7, 7, 7, 7, 7, 7, 7, 7, 4])
     }
 
     #[test]
@@ -990,7 +990,7 @@ mod tests {
             assert_eq!(super::gallop_right(&v, &s, &|&a, &b|{count.set(count.get() + 1); usize::cmp(&a, &b).if_equal(Ordering::Less)}), v);
             profile.push(count.get());
         }
-        assert_eq!(profile, vec![1, 2, 4, 4, 6, 6, 6, 6, 8, 8, 8, 8, 8, 8, 8, 8, 6, 6])
+        assert_eq!(profile, vec![2, 2, 3, 3, 5, 5, 5, 5, 7, 7, 7, 7, 7, 7, 7, 7, 5, 5   ])
     }
 
     #[test]
@@ -1002,7 +1002,7 @@ mod tests {
             assert_eq!(super::gallop_right(&v, &s, &|&a, &b|{count.set(count.get() + 1); usize::cmp(&a, &b).if_equal(Ordering::Less)}), v);
             profile.push(count.get());
         }
-        assert_eq!(profile, vec![1, 2, 4, 4, 6, 6, 6, 6, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 7, 7, 7])
+        assert_eq!(profile, vec![2, 2, 3, 3, 5, 5, 5, 5, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 6, 6, 6])
     }
 
     #[test]
