@@ -494,9 +494,23 @@ where
     }
 }
 
+fn rotate_right_1<T>(s: &mut [T]) {
+    debug_assert!(s.len() > 1);
+    let r = s.len() - 1;
+    unsafe {
+        let src = s.as_ptr();
+        let dst = s.as_mut_ptr();
+        let mut tmp: T = std::mem::uninitialized();
+        std::ptr::copy_nonoverlapping(src.offset(r as isize), &mut tmp, 1);
+        std::ptr::copy(src, dst.offset(1), r);
+        std::ptr::copy_nonoverlapping(&tmp, dst, 1);
+        std::mem::forget(tmp);
+    }
+}
+
 pub fn sort4<T, F>(s: &mut [T], compare: &F)
-    where
-        F: Fn(&T, &T) -> Ordering
+where
+    F: Fn(&T, &T) -> Ordering
 {
     // Handcrafted sort for chunks of 4
     let length = s.len();
@@ -508,16 +522,16 @@ pub fn sort4<T, F>(s: &mut [T], compare: &F)
         }
         if compare(&chunk[1], &chunk[2]) == Ordering::Greater {
             if compare(&chunk[0], &chunk[2]) == Ordering::Greater {
-                rotate(&mut chunk[0 .. 3], 1);
+                rotate_right_1(&mut chunk[0 .. 3]);
             } else {
                 chunk.swap(1, 2);
             }
         }
         if compare(&chunk[1], &chunk[3]) == Ordering::Greater {
             if compare(&chunk[0], &chunk[3]) == Ordering::Greater {
-                rotate(chunk, 1);
+                rotate_right_1(chunk);
             } else {
-                rotate(&mut chunk[1 .. 4], 1);
+                rotate_right_1(&mut chunk[1 ..]);
             }
         } else if compare(&chunk[2], &chunk[3]) == Ordering::Greater {
             chunk.swap(2, 3);
@@ -530,7 +544,7 @@ pub fn sort4<T, F>(s: &mut [T], compare: &F)
         if over4 == 3 {
             if compare(&s[length4 + 1], &s[length4 + 2]) == Ordering::Greater {
                 if compare(&s[length4], &s[length4 + 2]) == Ordering::Greater {
-                    rotate(&mut s[length4 .. length4 + 3], 1);
+                    rotate_right_1(&mut s[length4 .. length4 + 3]);
                 } else {
                     s.swap(length4 + 1, length4 + 2);
                 }
