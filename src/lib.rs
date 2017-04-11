@@ -154,7 +154,7 @@ fn rotate_gcd<T>(s: &mut [T], k: usize) {
     // Rotate the last k elements to the front of the slice.
     // given a slice of 0..n, move n-k..n to front and 0..n-k to end
     let slen = s.len();
-    debug_assert!(k > 1 && k < slen - 1);
+    debug_assert!(k > 0 && k < slen);
     // for i = 0..k, add size of second section: new position = (i + k) % slen
     // for i = k..slen, subtract size of first section: new position = (i - slen + k) % slen = (i + k) % slen
     // so all elements need to have the same move applied
