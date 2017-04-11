@@ -174,6 +174,7 @@ fn rotate_gcd<T>(s: &mut [T], k: usize) {
             swap_ends(&mut s[0 .. j + blksize], blksize);
             j = add_modulo(j, k, slen);
         }
+        debug_assert!(j == 0);
     }
 }
 
