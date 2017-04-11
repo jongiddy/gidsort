@@ -18,8 +18,9 @@ const STACK_OBJECT_SIZE: usize = 2048;
 // The maximum GCD for which reverse is used to rotate. Above this value, block swapping is used.
 const ROTATE_REVERSE_MAX: usize = 4;
 
-// The minimum shift used in the insertion merge algorithm
-const INSERTION_MERGE_MIN_SHIFT: usize = 64;
+// The minimum shift used in the insertion merge algorithm. Use low factors, to increase the GCD
+// and make rotation faster.
+const INSERTION_MERGE_MIN_SHIFT: usize = 2 * 2 * 3 * 5;
 
 // equivalent to unstable Ordering::then
 trait IfEqual {
@@ -324,6 +325,10 @@ where
     // 4. r_0 is min value
     debug_assert!(cmpleftright(&s[left], &s[split]) != Ordering::Less);
 
+    let mut limit = INSERTION_MERGE_MIN_SHIFT;
+    if llen!() > INSERTION_MERGE_MIN_SHIFT * INSERTION_MERGE_MIN_SHIFT {
+        limit = (llen!() as f64).sqrt() as usize;
+    }
     let mut idx = 1;
     while llen!() > 1 {
         idx = gallop_right(&s[left], &s[split + idx .. right], cmpleftright) + idx;
@@ -332,7 +337,7 @@ where
             // all of R is less than L
             break
         }
-        if idx > INSERTION_MERGE_MIN_SHIFT && llen!() < idx * idx {
+        if idx > limit {
             // if idx > sqrt(|L|), shift L right
             // In theory, this can be done for any size. In practice, the cost of the multiplication
             // outweighs the benefit for small sequences, so guard this with a minimum size test.
@@ -341,6 +346,9 @@ where
             left += n;
             split += n;
             idx = 1;
+            if llen!() > INSERTION_MERGE_MIN_SHIFT * INSERTION_MERGE_MIN_SHIFT {
+                limit = (llen!() as f64).sqrt() as usize;
+            }
         }
         // we know R[idx] > L[0], so exclude it
         let pos = gallop_right(&s[split + idx], &s[left + 1 .. split - 1], cmprightleft) + 1;
