@@ -436,16 +436,16 @@ where
             // merge completed
             return
         }
-        // find Z in L where Z[i] < R'[0]
-        // - Since L[max] > R[max], exclude L[max] from search
-        // - Since R[r0 + xlen] > L[0] from previous search, exclude L[0] from search
-        // - this search relies on invariant |L| > 1, tested in assert
-        debug_assert!(l0 + 1 <= m0 - 1);
-        let zlen = gallop_right(&s[r0 + xlen], &s[l0 + 1 .. m0 - 1], cmprightleft) + 1;
-        if llen!() <= xlen + zlen {
-            // |L| < 2|X| + |Z|:
-            // Method E1
-            // rotate Z - LX - L' - X to X - Z - LX - L'
+        if llen!() < xlen {
+            // When L is too small to swap with X, rotate instead.  Also look for Z, to maintain
+            // the invariant that R[0] < L[0]
+            // find Z in L where Z[i] < R'[0]
+            // - Since L[max] > R[max], exclude L[max] from search
+            // - Since R[r0 + xlen] > L[0] from previous search, exclude L[0] from search
+            // - this search relies on invariant |L| > 1, tested in assert
+            debug_assert!(l0 + 1 <= m0 - 1);
+            let zlen = gallop_right(&s[r0 + xlen], &s[l0 + 1 .. m0 - 1], cmprightleft) + 1;
+            // rotate Z - L' - X to X - Z - L'
             rotate(&mut s[l0 .. r0 + xlen], xlen);
             l0 += xlen + zlen;
             m0 += xlen;
@@ -461,34 +461,29 @@ where
         }
         else {
             // Method E2
-            debug_assert!(xlen + zlen < llen!());
+            debug_assert!(xlen <= llen!());
             // swap L[X] with X
-            swap_ends(&mut s[l0 + zlen .. r0 + xlen], xlen);
-            // rotate Z - X to X - Z
-            rotate(&mut s[l0 .. l0 + zlen + xlen], xlen);
-            l0 += xlen + zlen;
+            swap_ends(&mut s[l0 .. r0 + xlen], xlen);
+            l0 += xlen;
             r0 += xlen;
-            // |M| > 0 and R[0] is minimum
+            // |M| > 0
             debug_assert!(mlen!() > 0); // |M| > 0
-            debug_assert!(cmpleftright(&s[m0], &s[r0]) != Ordering::Less);
-            if rlen!() == 1 {
-                // since r_0 is smallest value, if |R| = 1, rotate L-M-R to R-M-L
-                rotate(&mut s[m0 .. r1], rlen!());
-                rotate(&mut s[l0 .. r1], mlen!() + rlen!());
-                return;
-            }
             // insertion merge M into R
-            // Once M is in R, any M that is equal to an L will be sorted out of order.  This is
-            // not a problem as long as M is selected as being <(=) R'[0], since M[max] <= L[0] but
-            // M[max] == L[0] only if both == R'[0].  In a stable sort, this cannot happen, and in
-            // an unstable sort, it doesn't matter if it does.
-            // M[max] > R[0]
-            debug_assert!(cmpleftright(&s[r0 - 1], &s[r0]) != Ordering::Less);
+            // Once M is in R, any M that is compared to an L will be sorted out of order.  This is
+            // not a problem since we do not compare M values with L ever again. We assume that all
+            // of R up to M[max] < L[0].
             // Find the first position in R > M[max]
-            let pos = gallop_right(&s[r0 - 1], &s[r0 + 1 .. r1], cmpleftright) + r0 + 1;
-            insertion_merge_trimmed(&mut s[m0 .. pos], mlen!(), cmpleftright, cmprightleft);
+            let pos = match trim(&s[m0 .. r1], mlen!(), cmpleftright, cmprightleft) {
+                Some((left, right)) => {
+                    insertion_merge_trimmed(&mut s[m0 + left .. m0 + right], mlen!() - left, cmpleftright, cmprightleft);
+                    m0 + right
+                },
+                None => {
+                    r0
+                }
+            };
             r0 = m0;
-            if llen!() == 1 || pos == r1 {
+            if llen!() <= 1 || rlen!() <= 1 || pos == r1 {
                 // since l_max is largest value, if |L| = 1, rotate L-R to R-L
                 // if M[max] inserted at end of R, L > R, rotate L-R to R-L
                 rotate(&mut s[l0 .. r1], rlen!());
@@ -561,6 +556,7 @@ where
 
 fn sort_by_ordering<T, F, G>(s: &mut [T], cmpleftright: &F, cmprightleft: &G)
 where
+    T: std::fmt::Debug,
     F: Fn(&T, &T) -> Ordering,
     G: Fn(&T, &T) -> Ordering
 {
@@ -595,6 +591,7 @@ where
 
 pub fn sort_by<T, F>(s: &mut [T], compare: &F)
 where
+    T: std::fmt::Debug,
     F: Fn(&T, &T) -> Ordering
 {
     sort_by_ordering(
@@ -606,7 +603,7 @@ where
 
 pub fn sort<T>(s: &mut [T])
 where
-    T: Ord
+    T: Ord + std::fmt::Debug
 {
     sort_by(s, &T::cmp);
 }
