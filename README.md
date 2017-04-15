@@ -902,6 +902,8 @@ loop:
             find X in R where X[i] < L[0]
 ```
 
+Algorithm J was faster than Algorithm I, possibly due to the smaller sizes of the merged sequences.
+
 Given that M is being merged into R, we don't necessarily require that M is calculated the same way.
 We can reduce the number of rotations by swapping X (the part of R that is less than L<sub>0</sub>) with L<sub>X</sub> without trying to find Z.
 
@@ -934,3 +936,10 @@ A potential problem with this algorithm is that if M<sub>max</sub> == L'<sub>0</
 Any stable comparison of this M<sub>max</sub> value with L<sub>0</sub> will then get ordered incorrectly.
 This isn't actually a problem as we know that all values in R < M<sub>max</sub> are less than L.
 We should probably express the last two algorithms as inserting R into M, to create M < L<sub>0</sub> and R > L<sub>0</sub>.
+
+Algorithm K was slightly faster on random data than Algorithm J, but significantly slower on data containing a pattern (e.g. ascending and descending).
+The timings for these moved closer to the standard library sort.
+If Algorithm K was written before Algorithm J, J would be considered a major improvement in sort times for pattern-containing data with neglible cost to random data.
+Hence, we abandon K for the moment.
+
+One tentative conclusion of J vs K is that performing a galloping search along *both* sequences helps to speed up sequences containing patterns, and has low cost on random sequences.
