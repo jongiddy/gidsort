@@ -18,6 +18,10 @@ const STACK_OBJECT_SIZE: usize = 2048;
 // The maximum GCD for which reverse is used to rotate. Above this value, block swapping is used.
 const ROTATE_REVERSE_MAX: usize = 4;
 
+// The minimum shift used in the insertion merge algorithm. Use low factors, to increase the GCD
+// and make rotation faster.
+const INSERTION_MERGE_MIN_SHIFT: usize = 2 * 2 * 3 * 5;
+
 // equivalent to unstable Ordering::then
 trait IfEqual {
     fn if_equal(self, other: Ordering) -> Ordering;
@@ -351,7 +355,7 @@ where
             // R[idx - 1] < L[0]
             let right = gallop_right(&s[split + idx - 1], &s[split + idx + 1 ..], cmpleftright) + idx + 1;
             // R[.. pos] < R[idx] < R[pos .. idx - 1] ? R[idx + 1 .. right] < R[idx - 1] < R[right ..]
-            insertion_merge_trimmed(&mut s[split + pos .. split + right], idx - pos, cmpleftright, cmprightleft);
+            insertion_merge_trimmed_final(&mut s[split + pos .. split + right], idx - pos, cmpleftright, cmprightleft);
             // R[right - 1] < L[0]
             idx = right;
         } else {
@@ -372,6 +376,81 @@ where
             // R[idx] is the next lowest value and is less than L[0] (was L[pos])
             idx += 1
         }
+    }
+    // when we get here, we know that all values in L are greater than all values in R,
+    // either because |L| == 1, and we know that L[max] is greater than all values in R,
+    // or we just found that L[0] is greater than all values in R
+    rotate(&mut s[left .. right], rlen!());
+}
+
+fn insertion_merge_trimmed_final<T, F, G>(s: &mut [T], split: usize, cmpleftright: &F, cmprightleft: &G)
+where
+    F: Fn(&T, &T) -> Ordering,
+    G: Fn(&T, &T) -> Ordering
+{
+    let mut left = 0;
+    let mut split = split;
+    let right = s.len();
+
+    macro_rules! llen {() => (split - left)}
+    macro_rules! rlen {() => (right - split)}
+
+    // 1. |L| > 0
+    debug_assert!(llen!() > 0);
+    // 2. |R| > 0
+    debug_assert!(rlen!() > 0);
+    // 3. l_max is max value
+    debug_assert!(cmprightleft(&s[right - 1], &s[split - 1]) != Ordering::Greater);
+    // 4. r_0 is min value
+    debug_assert!(cmpleftright(&s[left], &s[split]) != Ordering::Less);
+
+    let mut limit = INSERTION_MERGE_MIN_SHIFT;
+    if llen!() > INSERTION_MERGE_MIN_SHIFT * INSERTION_MERGE_MIN_SHIFT {
+        limit = (llen!() as f64).sqrt() as usize;
+    }
+    let mut idx = 1;
+    while llen!() > 1 {
+        idx = gallop_right(&s[left], &s[split + idx .. right], cmpleftright) + idx;
+        // now R[idx] = first R element with non-zero insertion point in L
+        if idx == rlen!() {
+            // all of R is less than L
+            break
+        }
+        if idx > limit {
+            // if idx > sqrt(|L|), shift L right
+            // In theory, this can be done for any size. In practice, the cost of the multiplication
+            // outweighs the benefit for small sequences, so guard this with a minimum size test.
+            let n = idx - 1;
+            rotate(&mut s[left .. split + idx - 1], n);
+            left += n;
+            split += n;
+            idx = 1;
+            if llen!() > INSERTION_MERGE_MIN_SHIFT * INSERTION_MERGE_MIN_SHIFT {
+                limit = (llen!() as f64).sqrt() as usize;
+            }
+        }
+        // we know R[idx] > L[0], so exclude it
+        let pos = gallop_right(&s[split + idx], &s[left + 1 .. split - 1], cmprightleft) + 1;
+        // now R[idx] < L[pos]
+        if pos < idx {
+            // move lowest values in R to leftmost position in L
+            swap_ends(&mut s[left .. split + pos], pos);
+            // the new R[..pos] are > R[idx - 1] but < R[idx]
+            rotate(&mut s[split .. split + idx], idx - pos);
+        } else {
+            // move the highest values in L[..pos] out of the way to allow us to
+            // shift the lowest values from R to front of sequence.  Do this by
+            // swapping the high L values and the low R values, then rotating the
+            // low L values into their final position.
+            swap_ends(&mut s[left + pos - idx .. split + idx], idx);
+            rotate(&mut s[left .. left + pos], idx);
+        }
+        // L[.. pos] are now the lowest values in correct position:
+        // add them to sorted by trimming L
+        left += pos;
+        // the highest values moved to R are still < R[idx] and in fact
+        // R[idx] is the next lowest value and is less than L[0] (was L[pos])
+        idx += 1
     }
     // when we get here, we know that all values in L are greater than all values in R,
     // either because |L| == 1, and we know that L[max] is greater than all values in R,
