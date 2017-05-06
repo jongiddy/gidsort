@@ -22,20 +22,6 @@ const ROTATE_REVERSE_MAX: usize = 4;
 // and make rotation faster.
 const INSERTION_MERGE_MIN_SHIFT: usize = 2 * 2 * 3 * 5;
 
-// equivalent to unstable Ordering::then
-trait IfEqual {
-    fn if_equal(self, other: Ordering) -> Ordering;
-}
-
-impl IfEqual for Ordering {
-    #[inline]
-    fn if_equal(self, other: Ordering) -> Ordering {
-        match self {
-            Ordering::Equal => other,
-            _ => self,
-        }
-    }
-}
 
 fn gallop_right<T, F>(value: &T, buffer: &[T], compare: &F) -> usize
 where
@@ -677,8 +663,8 @@ where
 {
     sort_by_ordering(
         s,
-        &|ref a, ref b|{compare(&a, &b).if_equal(Ordering::Less)},
-        &|ref a, ref b|{compare(&a, &b).if_equal(Ordering::Greater)}
+        &|ref a, ref b|{compare(&a, &b).then(Ordering::Less)},
+        &|ref a, ref b|{compare(&a, &b).then(Ordering::Greater)}
     )
 }
 
@@ -693,7 +679,6 @@ where
 mod tests {
     use std::cell::Cell;
     use std::cmp::Ordering;
-    use super::IfEqual;
 
     // A non-copy but comparable type is useful for testing, as bad moves are hidden by Copy types.
     #[derive(PartialEq,Eq,PartialOrd,Ord,Debug)]
@@ -1027,13 +1012,13 @@ mod tests {
     #[test]
     fn gallop_right_3_lt() {
         // Default to Ordering::Less if the value should be inserted before equal values
-        let compare = |a: &Nc, b: &Nc|{Nc::cmp(&a, &b).if_equal(Ordering::Less)};
+        let compare = |a: &Nc, b: &Nc|{Nc::cmp(&a, &b).then(Ordering::Less)};
         assert_eq!(super::gallop_right(&Nc(4), &[Nc(2), Nc(4), Nc(6)], &compare), 1)
     }
     #[test]
     fn gallop_right_3_le() {
         // Default to Ordering::Greater if value should be inserted after equal values
-        let compare = |a: &Nc, b: &Nc|{Nc::cmp(&a, &b).if_equal(Ordering::Greater)};
+        let compare = |a: &Nc, b: &Nc|{Nc::cmp(&a, &b).then(Ordering::Greater)};
         assert_eq!(super::gallop_right(&Nc(4), &[Nc(2), Nc(4), Nc(6)], &compare), 2)
     }
     #[test]
@@ -1047,7 +1032,7 @@ mod tests {
         let mut profile = Vec::new();
         for v in 0 .. s.len() + 1 {
             let count = Cell::new(0);
-            assert_eq!(super::gallop_right(&v, &s, &|&a, &b|{count.set(count.get() + 1); usize::cmp(&a, &b).if_equal(Ordering::Less)}), v);
+            assert_eq!(super::gallop_right(&v, &s, &|&a, &b|{count.set(count.get() + 1); usize::cmp(&a, &b).then(Ordering::Less)}), v);
             profile.push(count.get());
         }
         assert_eq!(profile, vec![2, 2, 3, 3, 5, 5, 5, 5, 6, 6, 6, 6, 6, 6, 6, 6])
@@ -1059,7 +1044,7 @@ mod tests {
         let mut profile = Vec::new();
         for v in 0 .. s.len() + 1 {
             let count = Cell::new(0);
-            assert_eq!(super::gallop_right(&v, &s, &|&a, &b|{count.set(count.get() + 1); usize::cmp(&a, &b).if_equal(Ordering::Less)}), v);
+            assert_eq!(super::gallop_right(&v, &s, &|&a, &b|{count.set(count.get() + 1); usize::cmp(&a, &b).then(Ordering::Less)}), v);
             profile.push(count.get());
         }
         assert_eq!(profile, vec![2, 2, 3, 3, 5, 5, 5, 5, 7, 7, 7, 7, 7, 7, 7, 7, 4])
@@ -1071,7 +1056,7 @@ mod tests {
         let mut profile = Vec::new();
         for v in 0 .. s.len() + 1 {
             let count = Cell::new(0);
-            assert_eq!(super::gallop_right(&v, &s, &|&a, &b|{count.set(count.get() + 1); usize::cmp(&a, &b).if_equal(Ordering::Less)}), v);
+            assert_eq!(super::gallop_right(&v, &s, &|&a, &b|{count.set(count.get() + 1); usize::cmp(&a, &b).then(Ordering::Less)}), v);
             profile.push(count.get());
         }
         assert_eq!(profile, vec![2, 2, 3, 3, 5, 5, 5, 5, 7, 7, 7, 7, 7, 7, 7, 7, 5, 5   ])
@@ -1083,7 +1068,7 @@ mod tests {
         let mut profile = Vec::new();
         for v in 0 .. s.len() + 1 {
             let count = Cell::new(0);
-            assert_eq!(super::gallop_right(&v, &s, &|&a, &b|{count.set(count.get() + 1); usize::cmp(&a, &b).if_equal(Ordering::Less)}), v);
+            assert_eq!(super::gallop_right(&v, &s, &|&a, &b|{count.set(count.get() + 1); usize::cmp(&a, &b).then(Ordering::Less)}), v);
             profile.push(count.get());
         }
         assert_eq!(profile, vec![2, 2, 3, 3, 5, 5, 5, 5, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 6, 6, 6])
@@ -1123,13 +1108,13 @@ mod tests {
     #[test]
     fn binary_search_3_lt() {
         // Default to Ordering::Less if the value should be inserted before equal values
-        let compare = |a: &Nc, b: &Nc|{Nc::cmp(&a, &b).if_equal(Ordering::Less)};
+        let compare = |a: &Nc, b: &Nc|{Nc::cmp(&a, &b).then(Ordering::Less)};
         assert_eq!(super::binary_search(&Nc(4), &[Nc(2), Nc(4), Nc(6)], &compare), 1)
     }
     #[test]
     fn binary_search_3_le() {
         // Default to Ordering::Greater if value should be inserted after equal values
-        let compare = |a: &Nc, b: &Nc|{Nc::cmp(&a, &b).if_equal(Ordering::Greater)};
+        let compare = |a: &Nc, b: &Nc|{Nc::cmp(&a, &b).then(Ordering::Greater)};
         assert_eq!(super::binary_search(&Nc(4), &[Nc(2), Nc(4), Nc(6)], &compare), 2)
     }
     #[test]
@@ -1143,7 +1128,7 @@ mod tests {
         let mut profile = Vec::new();
         for v in 0 .. s.len() + 1 {
             let count = Cell::new(0);
-            assert_eq!(super::binary_search(&v, &s, &|&a, &b|{count.set(count.get() + 1); usize::cmp(&a, &b).if_equal(Ordering::Less)}), v);
+            assert_eq!(super::binary_search(&v, &s, &|&a, &b|{count.set(count.get() + 1); usize::cmp(&a, &b).then(Ordering::Less)}), v);
             profile.push(count.get());
         }
         assert_eq!(profile, vec![4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4])
@@ -1153,7 +1138,7 @@ mod tests {
     fn binary_search_stable() {
         let s = [1, 5, 5, 5, 5, 5, 8];
         let count = Cell::new(0);
-        super::binary_search(&5, &s, &|&a, &b|{count.set(count.get() + 1); i32::cmp(&a, &b).if_equal(Ordering::Less)});
+        super::binary_search(&5, &s, &|&a, &b|{count.set(count.get() + 1); i32::cmp(&a, &b).then(Ordering::Less)});
         assert_eq!(count.get(), 3);
     }
 
