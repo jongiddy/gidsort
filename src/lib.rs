@@ -630,30 +630,31 @@ where
 {
     let length = s.len();
     sort4(s, cmpleftright);
-    let mut blk = 4;  // size of blocks already sorted
-    while blk < length {
+    let mut sorted_size = 4;  // size of blocks already sorted
+    while sorted_size < length {
+        let merge_size = sorted_size * 2;
         let mut start = 0;
-        let mut end = 2 * blk;
+        let mut end = merge_size;
         while end < length {
             merge(
                 &mut s[start .. end],
-                blk,
+                sorted_size,
                 cmpleftright,
                 cmprightleft
             );
             start = end;
-            end += 2 * blk;
+            end += merge_size;
         }
         // for tail, if right side contains at least one element, perform an additional merge
-        if start + blk < length {
+        if start + sorted_size < length {
             merge(
                 &mut s[start .. length],
-                blk,
+                sorted_size,
                 cmpleftright,
                 cmprightleft
             );
         }
-        blk *= 2;
+        sorted_size = merge_size;
     }
 }
 
