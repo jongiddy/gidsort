@@ -274,7 +274,7 @@ where
     // From above, r[0] <= l[max], so exclude r[0] from search.
     let right = binary_search(&s[split - 1], &s[split + 1 .. slen], cmpleftright) + split + 1;
 
-    // Trim off in-position low values of L to leave r[max] as smallest value
+    // Trim off in-position low values of L to leave r[0] as smallest value
     // From above, l[max] >= r[0], so exclude l[max] from search.
     let left = gallop_right(&s[split], &s[.. split - 1], cmprightleft);
 
