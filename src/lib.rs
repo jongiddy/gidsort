@@ -564,6 +564,193 @@ where
     }
 }
 
+fn merge_trimmed_final<T, F, G>(s: &mut [T], split: usize, cmpleftright: &F, cmprightleft: &G)
+where
+    F: Fn(&T, &T) -> Ordering,
+    G: Fn(&T, &T) -> Ordering
+{
+    // The slice to be sorted is divided into S0 | L | M | R | S1
+    // The indexes into the slice are l0, m0, r0, r1
+    let mut l0 = 0;
+    let mut m0 = split;
+    let mut r0 = split;
+    let r1 = s.len();
+
+    macro_rules! llen {() => (m0 - l0)}
+    macro_rules! mlen {() => (r0 - m0)}
+    macro_rules! rlen {() => (r1 - r0)}
+
+    debug_assert!(llen!() > 0);
+    debug_assert!(rlen!() > 0);
+
+    if llen!() == 1 || rlen!() == 1 {
+        // since r_0 is smallest value, if |R| = 1, we just need to swap L and R
+        // since l_max is largest value, if |L| = 1, we just need to swap L and R
+        rotate(&mut s[l0 .. r1], rlen!());
+        return;
+    }
+
+    // At this point, we have several invariants:
+    // 1. r_0 is min value
+    debug_assert!(cmpleftright(&s[l0], &s[r0]) != Ordering::Less);
+    // 2. l_max is max value
+    debug_assert!(cmprightleft(&s[r1 - 1], &s[m0 - 1]) != Ordering::Greater);
+    // 3. |L| > 1
+    debug_assert!(llen!() > 1);
+    // 4. |M| == 0
+    debug_assert!(mlen!() == 0);
+    // 5. |R| > 1
+    debug_assert!(rlen!() > 1);
+
+    // find X in R where X[i] < L[0]
+    // - Since R[0] is minimum, L[0] > R[0], so exclude R[0] from search
+    let mut xlen = gallop_right(&s[l0], &s[r0 + 1 .. r1], cmpleftright) + 1;
+    loop {
+        debug_assert!(mlen!() == 0);    // |M| == 0
+        if xlen == rlen!() {
+            // |X| == |R|:
+            // rotate(L, R)
+            rotate(&mut s[l0 .. r1], rlen!());
+            // merge completed
+            return
+        }
+        // find Z in L where Z[i] < R'[0]
+        // - Since L[max] > R[max], exclude L[max] from search
+        // - Since R[r0 + xlen] > L[0] from previous search, exclude L[0] from search
+        // - this search relies on invariant |L| > 1, tested in assert
+        debug_assert!(l0 + 1 <= m0 - 1);
+        let zlen = gallop_right(&s[r0 + xlen], &s[l0 + 1 .. m0 - 1], cmprightleft) + 1;
+        if llen!() < xlen + zlen {
+            // |L| < 2|X| + |Z|:
+            // Method E1
+            // rotate Z - LX - L' - X to X - Z - LX - L'
+            rotate(&mut s[l0 .. r0 + xlen], xlen);
+            l0 += xlen + zlen;
+            m0 += xlen;
+            r0 = m0;
+            if llen!() == 1 || rlen!() == 1 {
+                // since r_0 is smallest value, if |R| = 1, we just need to swap L and R
+                // since l_max is largest value, if |L| = 1, we just need to swap L and R
+                rotate(&mut s[l0 .. r1], rlen!());
+                return;
+            }
+            debug_assert!(r0 + 1 < r1);
+            xlen = gallop_right(&s[l0], &s[r0 + 1 .. r1], cmpleftright) + 1;
+        }
+        else {
+            // Method E2
+            debug_assert!(xlen + zlen <= llen!());
+            // swap L[X] with X
+            swap_ends(&mut s[l0 + zlen .. r0 + xlen], xlen);
+            // rotate Z - X to X - Z
+            rotate(&mut s[l0 .. l0 + zlen + xlen], xlen);
+            l0 += xlen + zlen;
+            r0 += xlen;
+            if rlen!() == 1 {
+                // since r_0 is smallest value, if |R| = 1, rotate L-M-R to R-M-L
+                rotate(&mut s[m0 .. r1], rlen!());
+                rotate(&mut s[l0 .. r1], mlen!() + rlen!());
+                return;
+            }
+            // assert |M| > 0 and R[0] is minimum
+            debug_assert!(mlen!() > 0); // |M| > 0
+            // find X in R where X[i] < M[0]
+            debug_assert!(r0 + 1 < r1);
+            xlen = gallop_right(&s[m0], &s[r0 + 1 .. r1], cmpleftright) + 1;
+            loop {
+                if llen!() < xlen {
+                    // |L| < |X|:
+                    // rotate(L, M)
+                    rotate(&mut s[l0 .. r0], mlen!());
+                    // merge M-L to L, and X still valid
+                    m0 = r0;
+                    break
+                }
+                if xlen == rlen!() {
+                    // |X| == |R|:
+                    // Method B2
+                    // rotate M - R to R - M
+                    rotate(&mut s[m0 .. r1], rlen!());
+                    // rotate L - R - M to R - M - L
+                    rotate(&mut s[l0 .. r1], mlen!() + rlen!());
+                    // merge completed
+                    return
+                }
+                // find Y in M where Y[i] < R'[0]
+                let ylen = gallop_right(&s[r0 + xlen], &s[m0 + 1 .. r0], cmprightleft) + 1;
+                if ylen == mlen!() {
+                    // |Y| == |M|:
+                    // find Z in L where Z[i] < R'[0]
+                    let zlen = gallop_right(&s[r0 + xlen], &s[l0 .. m0 - 1], cmprightleft);
+                    // Methods C1 and C3 both start with a rotate of Y - X
+                    rotate(&mut s[m0 .. r0 + xlen], xlen);
+                    if llen!() < xlen + ylen + zlen {
+                        // Method C1
+                        // rotate Y - X to X - Y
+                        // rotate Z - LX - LY - L' - X - Y to X - Y - Z - LX - LY - L'
+                        rotate(&mut s[l0 .. r0 + xlen], xlen + ylen);
+                        l0 += xlen + ylen + zlen;
+                        r0 += xlen;
+                        m0 = r0;
+                        if llen!() == 1 || rlen!() == 1 {
+                            // since r_0 is smallest value, if |R| = 1, we just need to swap L and R
+                            // since l_max is largest value, if |L| = 1, we just need to swap L and R
+                            rotate(&mut s[l0 .. r1], rlen!());
+                            return;
+                        }
+                        // find X in R where X[i] < L[0]
+                        debug_assert!(r0 + 1 < r1);
+                        xlen = gallop_right(&s[l0], &s[r0 + 1 .. r1], cmpleftright) + 1;
+                        break
+                    }
+                    // Method C3
+                    debug_assert!(xlen + ylen <= llen!());
+                    // rotate Y - X to X - Y
+                    // rotate Z - LX - LY to LX - LY - Z
+                    rotate(&mut s[l0 .. l0 + zlen + xlen + ylen], xlen + ylen);
+                    // swap LX - LY with X - Y
+                    swap_ends(&mut s[l0 .. r0 + xlen], xlen + ylen);
+                    l0 += xlen + ylen + zlen;
+                    r0 += xlen;
+                } else {
+                    if llen!() < mlen!() + xlen {
+                        // this method works for |L| < |X| + |Y|. However, |M| is a major
+                        // factor in the amount of work done, so we use it instead of |Y|.
+                        // Since |Y| < |M|, we always take the work that A1 can't handle.
+                        // Method A2
+                        debug_assert!(xlen <= llen!());
+                        // swap LX with X
+                        swap_ends(&mut s[l0 .. r0 + xlen], xlen);
+                        // rotate LY - L' - Y to Y - LY - L'
+                        rotate(&mut s[l0 + xlen .. m0 + ylen], ylen);
+                        l0 += xlen + ylen;
+                        m0 += ylen;
+                        r0 += xlen;
+                    } else {
+                        // Method A1
+                        debug_assert!(xlen + ylen <= llen!());
+                        // rotate Y - M' - X to M' - X - Y
+                        rotate(&mut s[m0 .. r0 + xlen], mlen!() - ylen + xlen);
+                        // swap LX - LY with X - Y
+                        swap_ends(&mut s[l0 .. r0 + xlen], xlen + ylen);
+                        l0 += xlen + ylen;
+                        r0 += xlen;
+                    }
+                }
+                debug_assert!(mlen!() > 0); // |M| > 0
+                if rlen!() == 1 {
+                    // since r_0 is smallest value, if |R| = 1, rotate L-M-R to R-M-L
+                    rotate(&mut s[m0 .. r1], rlen!());
+                    rotate(&mut s[l0 .. r1], mlen!() + rlen!());
+                    return;
+                }
+                debug_assert!(r0 + 1 < r1);
+                xlen = gallop_right(&s[m0], &s[r0 + 1 .. r1], cmpleftright) + 1;
+            }
+        }
+    }
+}
+
 fn rotate_right_1<T>(s: &mut [T]) {
     debug_assert!(s.len() > 1);
     let r = s.len() - 1;
