@@ -1,3 +1,5 @@
+#![feature(stmt_expr_attributes)]
+
 extern crate gcd;
 
 use std::cmp::Ordering;
@@ -64,6 +66,7 @@ where
                 p2 *= 2;
             },
             Ordering::Equal => {
+                #![cold]
                 return trial;
             }
         }
@@ -94,6 +97,7 @@ where
                 lo = trial + 1;
             },
             Ordering::Equal => {
+                #![cold]
                 return trial;
             },
         }
