@@ -32,12 +32,11 @@ where
     // Find the insertion point in an ordered buffer where the value should be inserted to maintain
     // the ordering.  All elements to the left of the insertion point are Less than the value and
     // the value is Less than all elements to the right of the insertion point.  The ordering is
-    // defined by the "compare" function.  If the "compare" function returns Equal, then the
-    // behaviour is defined by the when_equal parameter. If Less or Greater, the compare acts as
-    // though the when_equal value was returned by compare(value, &buffer[i]). This is useful for
-    // enforcing stability.  If the when_equal value is Equal, then the caller doesn't care about
-    // stability and the function returns immediately with one (of possibly many) valid insertion
-    // points.
+    // defined by the "compare" function.  The value is always on the left side of the comparison,
+    // so, for stable sort, return Less if the value should stay left of any equal values, or
+    // Greater if the value should stay right of any equal values. If the "compare" function
+    // returns Equal, the function returns immediately with one (of possibly many) valid insertion
+    // points. This is useful for unstable sort.
     let length = buffer.len();
     let mut lo = 0;       // lowest candidate
     let mut hi = length;  // highest candidate
@@ -73,8 +72,8 @@ where
     }
 
     // At this point, either hi == length, and we're processing the rump of the sequence, or
-    // lo-hi is a balanced binary tree containing the correct position.  A balanced binary tree
-    // contains 2^n - 1 elements.  Perform binary search to find the final insertion position.
+    // lo-hi contains 2^n - 1 elements containing the correct position.  2^n - 1 elements gives us
+    // a balanced binary tree.  Perform binary search to find the final insertion position.
     debug_assert!(hi == length || (hi - lo + 1).is_power_of_two());
     binary_search(value, &buffer[lo .. hi], compare) + lo
 }
@@ -252,14 +251,14 @@ where
     // that sequences that are in order use one comparison.   Much real data is close to already
     // sorted, so optimising this case is valuable.
     //
-    // Then, a binary search of the l[max] over the remaining R is done, as any values in R that are
-    // higher than l[max] are already in their final position, and can be ignored.  In a typical
-    // mergesort, the two sequences will each have length 2^n, and the first step means we search one
-    // less = 2^n - 1.  This is the optimal size for binary search, as it means the search must take
-    // log2 n comparisons.
+    // Then, a binary search of the l[max] value over R is done, as any values in R that are higher
+    // than l[max] are already in their final position, and can be ignored.  In a typical mergesort,
+    // the two sequences will each have length 2^n, and the first step means we search one less, or
+    // `2^n - 1`.  This is the optimal size for binary search, as it means the search must take
+    // `log2 n` comparisons.
     //
     // Finally, we check for values in L that are less than r[0], as they are also in their final
-    // position.  In this case, we gallop right, since we expect r[0] to be lower than the average
+    // position.  In this case, we gallop right, since we expect r[0] to be lower than the median
     // value in L.
     let slen = s.len();
     let llen = split;
@@ -546,10 +545,10 @@ where
                 return;
             }
             // insertion merge M into R
-            // Once M is in R, any M that is equal to an L will be sorted out of order.  This is
-            // not a problem as long as M is selected as being <(=) R'[0], since M[max] <= L[0] but
-            // M[max] == L[0] only if both == R'[0].  In a stable sort, this cannot happen, and in
-            // an unstable sort, it doesn't matter if it does.
+            // M contains values from L and we are about to mix them into R. If M[max] == L[0]
+            // (they were two equal and adjacent values in L), then their order would be swapped
+            // in subsequent sorts.  This is prevented by calculating `xlen` at the end to start
+            // after the final position of M[max] in R.
             // M[max] > R[0]
             debug_assert!(cmpleftright(&s[r0 - 1], &s[r0]) != Ordering::Less);
             // Find the first position in R > M[max]
