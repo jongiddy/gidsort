@@ -740,14 +740,38 @@ This additional knowledge allows us to change many of the single shifts into mul
 For example, an algorithm for this insertion-merge could be:
 
 - Find the insertion point pos1 in R for the largest M value first.
+
+	`a c g [l] / b d e f h i j k (pos1) m`
+
 - Find the insertion point pos0 for the next largest value in M.
-- Swap M[max] with the value at R[pos0+1].
-- M now contains two values that go next to each other in the final sequence.
-- Rotate the sequence in R from pos0+1 .. pos1 left one, so all R values shift left and the M value moves to the end.
+
+	`a c [g] l / b d e f (pos0) h i j k (pos1) m`
+
+- Swap M[max] with the value at R[pos0]. M now contains 2 values that go next to each other in the final sequence.
+
+	`a c g [h] / b d e f (pos0) [l] i j k (pos1) m`
+
+- Rotate the sequence in R from pos0 .. pos1 left one, so all R values shift left and the M value moves to the end.
+
+	`a c g h / b d e f (pos0) i j k [l] (pos1) m`
+
 - Set pos1 = pos0
+
+	`a c g h / b d e f (pos1) i j k l m`
+
 - Find the insertion point pos0 for the next largest value in M.
-- Swap two values above pos with the highest two values in M, and rotate left two
-- etc.
+
+	`a [c] g h / b (pos0) d e f (pos1) i j k l m`
+
+- Swap 2 values above pos0 with the highest 2 values in M. M now contains 3 values that go next to each other in the final sequence.
+
+	`a c [d e] / b (pos0) [g h] f (pos1) i j k l m`
+
+- Rotate the sequence in R from pos0 .. pos1 left 2, so all R values shift left and the M value moves to the end.
+
+	`a [c] d e / b (pos0) f [g h] (pos1) i j k l m`
+
+- Repeat, incrementing the number of values swapped each time, with an end-game for when either side does not have enough values.
 
 > Alternatively, when we move R<sub>low</sub> to L<sub>low</sub> and open a gap in front of R, open a similar gap at end of R (called B) by moving R<sub>high</sub> values and inserting them into L<sub>high</sub>. Call the sorted L<sub>high</sub> block H.  Move L<sub>low</sub> into B backwards.
 >
@@ -943,3 +967,41 @@ If Algorithm K was written before Algorithm J, J would be considered a major imp
 Hence, we abandon K for the moment.
 
 One tentative conclusion of J vs K is that performing a galloping search along *both* sequences helps to speed up sequences containing patterns, and has low cost on random sequences.
+
+With random data, the algorithm is likely to find that X and Z are often very small. When we perform Method E2 to create M, it may often contain one element. When we perform Method E2 to create M of size 1, we then shift all values in R < M left one, and then in the subsequent step move those values to L. Since |M| = 1 is likely to be common in random data, this causes a lot of single shifting of R.  We can short-cut this step by swapping all values of R < M into L to create a larger M.  A larger M allows us to shift more of R further on each iteration.
+
+Starting with |M| = 1, and X contains all values of R less than M<sub>0</sub>.
+
+| S | L | M | R |
+|---|---|---|---|
+| S | L | M | X - R' |
+
+we want to end up with X appended to S, and our invariants kept: each of L, M, and R ordered internally and M < L:
+
+Configuration 10:
+
+| S | L | M | R |
+|---|---|---|---|
+| S - X | L' | M - L<sub>X</sub> | R' |
+
+Method F1:
+
+| Sequence | Step | Total moves | Final moves | Net moves |
+|---|---|---|---|---|
+| Z - L<sub>X</sub> - L' - M - X - R' | swap L<sub>X</sub> with X | 2\|X\| | \|X\| | \|X\| |
+| Z - X - L' - M - L<sub>X</sub> - R' | = reconfiguration 10 | | total = | \|X\| |
+
+- only works for |X| <= |L|
+- note, if |L| == |X|, we can forget L and rename M as L
+- if |L| < |X|, we can swap |L| values, forget L, and rename M as L, but we also know that the remainder of X < L - this can be handled as a rotation of L' - M - X. M < R, so M can be appended to R.
+
+Method F2:
+
+| Sequence | Step | Total moves | Final moves | Net moves |
+|---|---|---|---|---|
+| L - M - X - R' | rotate L - M - X to X - L - M | \|L\| + \|X\| + 1 | \|X\| | \|L\| + 1 |
+| X - L - M - R | merge M to R | | total = | \|L\| + 1 |
+
+- fewer moves when \|L\| + 1 < \|X\|
+
+This was implemented as Algorithm L. It has minimal effect on timings.

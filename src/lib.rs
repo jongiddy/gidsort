@@ -311,9 +311,9 @@ where
     // 2. |R| > 0
     debug_assert!(rlen!() > 0);
     // 3. l_max is max value
-    debug_assert!(cmprightleft(&s[right - 1], &s[split - 1]) != Ordering::Greater);
+    debug_assert!(cmprightleft(&s[right - 1], &s[split - 1]) == Ordering::Less);
     // 4. r_0 is min value
-    debug_assert!(cmpleftright(&s[left], &s[split]) != Ordering::Less);
+    debug_assert!(cmpleftright(&s[left], &s[split]) == Ordering::Greater);
 
     let mut idx = 1;
     while llen!() > 1 {
@@ -480,9 +480,9 @@ where
     // 3. |R| > 0
     debug_assert!(rlen!() > 0);
     // 4. l_max is max value
-    debug_assert!(cmprightleft(&s[r1 - 1], &s[r0 - 1]) != Ordering::Greater);
+    debug_assert!(cmprightleft(&s[r1 - 1], &s[r0 - 1]) == Ordering::Less);
     // 5. r_0 is min value
-    debug_assert!(cmpleftright(&s[l0], &s[r0]) != Ordering::Less);
+    debug_assert!(cmpleftright(&s[l0], &s[r0]) == Ordering::Greater);
 
     if llen!() == 1 || rlen!() == 1 {
         // since r_0 is smallest value, if |R| = 1, we just need to swap L and R
@@ -495,7 +495,6 @@ where
     // - Since R[0] is minimum, L[0] > R[0], so exclude R[0] from search
     let mut xlen = gallop_right(&s[l0], &s[r0 + 1 .. r1], cmpleftright) + 1;
     loop {
-        debug_assert!(mlen!() == 0);    // |M| == 0
         if xlen == rlen!() {
             // |X| == |R|:
             // rotate(L, R)
@@ -547,22 +546,70 @@ where
             // insertion merge M into R
             // M contains values from L and we are about to mix them into R. If M[max] == L[0]
             // (they were two equal and adjacent values in L), then their order would be swapped
-            // in subsequent sorts.  This is prevented by calculating `xlen` at the end to start
+            // in subsequent sorts.  This is prevented by calculating `r0` at the end to start
             // after the final position of M[max] in R.
             // M[max] > R[0]
             debug_assert!(cmpleftright(&s[r0 - 1], &s[r0]) != Ordering::Less);
             // Find the first position in R > M[max]
             let pos = gallop_right(&s[r0 - 1], &s[r0 + 1 .. r1], cmpleftright) + r0 + 1;
-            insertion_merge_trimmed(&mut s[m0 .. pos], mlen!(), cmpleftright, cmprightleft);
-            r0 = m0;
-            if llen!() == 1 || pos == r1 {
+            r0 = if mlen!() == 1 {
+                // if |M| == 1, then merging will shift X left one, and the subsequent step will
+                // move X to L - this is particularly likely for random data. Give it a performance
+                // boost by swapping X and L now to create a bigger M.
+                let xlen = pos - r0;
+                if llen!() < xlen {
+                    // method F2
+                    rotate(&mut s[l0 .. pos], xlen);
+                    // L shifts right xlen, and single M element merges into R
+                    l0 += xlen;
+                    m0 += xlen;
+                    m0 + 1
+                } else {
+                    // method F1
+                    swap_ends(&mut s[l0 .. pos], xlen);
+                    l0 += xlen;
+                    r0 += xlen;
+                    if rlen!() == 0 {
+                        rotate(&mut s[l0 .. r0], mlen!());
+                        return;
+                    }
+                    debug_assert!(rlen!() != 0);
+                    match trim(&s[m0 .. r1], mlen!(), cmpleftright, cmprightleft) {
+                        // 13569//2478X -> 12569/3/478X -> 12349/56/78X
+                        None => {
+                            r0
+                        }
+                        Some((x, y)) => {
+                            merge_trimmed(
+                                &mut s[m0 + x .. m0 + y], mlen!() - x, cmpleftright, cmprightleft
+                            );
+                            m0 + y
+                        }
+                    }
+                }
+            } else {
+                //
+                // M[max] > R[0]
+                debug_assert!(mlen!() > 0);
+                debug_assert!(rlen!() > 0);
+                debug_assert!(cmprightleft(&s[pos - 1], &s[r0 - 1]) != Ordering::Greater);
+                debug_assert!(cmpleftright(&s[m0], &s[r0]) != Ordering::Less);
+                insertion_merge_trimmed(&mut s[m0 .. pos], mlen!(), cmpleftright, cmprightleft);
+                pos
+            };
+            if llen!() == 1 || r0 == r1 {
                 // since l_max is largest value, if |L| = 1, rotate L-R to R-L
                 // if M[max] inserted at end of R, L > R, rotate L-R to R-L
-                rotate(&mut s[l0 .. r1], rlen!());
+                rotate(&mut s[l0 .. r1], mlen!() + rlen!());
                 return;
             }
             // search for the next insertion point for L[0] in R above M[max]
-            xlen = gallop_right(&s[l0], &s[pos .. r1], cmpleftright) + pos - r0;
+            xlen = mlen!() + gallop_right(&s[l0], &s[r0 .. r1], cmpleftright);
+            r0 = m0;
+            debug_assert!(llen!() > 1);
+            debug_assert!(mlen!() == 0);    // |M| == 0
+            debug_assert!(rlen!() > 1);
+            debug_assert!(cmprightleft(&s[r1 - 1], &s[r0 - 1]) == Ordering::Less);
         }
     }
 }
