@@ -3,6 +3,7 @@
 
 extern crate gcd;
 
+use std::cmp::min;
 use std::cmp::Ordering;
 
 use gcd::Gcd;
@@ -724,48 +725,59 @@ fn rotate_right_1<T>(s: &mut [T]) {
     }
 }
 
-pub fn sort4<T, F>(s: &mut [T], compare: &F)
+fn sort4<T, F>(s: &mut [T], compare: &F)
 where
     F: Fn(&T, &T) -> Ordering
 {
     // Handcrafted sort for chunks of 4
-    let length = s.len();
-    let over4 = length % 4;
-    let length4 = length - over4;
-    for chunk in s[0 .. length4].chunks_mut(4) {
-        if compare(&chunk[0], &chunk[1]) == Ordering::Greater {
-            chunk.swap(0, 1);
-        }
-        if compare(&chunk[1], &chunk[2]) == Ordering::Greater {
-            if compare(&chunk[0], &chunk[2]) == Ordering::Greater {
-                rotate_right_1(&mut chunk[0 .. 3]);
-            } else {
-                chunk.swap(1, 2);
-            }
-        }
-        if compare(&chunk[1], &chunk[3]) == Ordering::Greater {
-            if compare(&chunk[0], &chunk[3]) == Ordering::Greater {
-                rotate_right_1(chunk);
-            } else {
-                rotate_right_1(&mut chunk[1 ..]);
-            }
-        } else if compare(&chunk[2], &chunk[3]) == Ordering::Greater {
-            chunk.swap(2, 3);
+    debug_assert!(s.len() == 4);
+    if compare(&s[0], &s[1]) == Ordering::Greater {
+        s.swap(0, 1);
+    }
+    if compare(&s[1], &s[2]) == Ordering::Greater {
+        if compare(&s[0], &s[2]) == Ordering::Greater {
+            rotate_right_1(&mut s[0 .. 3]);
+        } else {
+            s.swap(1, 2);
         }
     }
-    if over4 >= 2 {
-        if compare(&s[length4], &s[length4 + 1]) == Ordering::Greater {
-            s.swap(length4, length4 + 1);
+    if compare(&s[1], &s[3]) == Ordering::Greater {
+        if compare(&s[0], &s[3]) == Ordering::Greater {
+            rotate_right_1(s);
+        } else {
+            rotate_right_1(&mut s[1 ..]);
         }
-        if over4 == 3 {
-            if compare(&s[length4 + 1], &s[length4 + 2]) == Ordering::Greater {
-                if compare(&s[length4], &s[length4 + 2]) == Ordering::Greater {
-                    rotate_right_1(&mut s[length4 .. length4 + 3]);
-                } else {
-                    s.swap(length4 + 1, length4 + 2);
-                }
-            }
+    } else if compare(&s[2], &s[3]) == Ordering::Greater {
+        s.swap(2, 3);
+    }
+}
+
+fn sort3<T, F>(s: &mut [T], compare: &F)
+where
+    F: Fn(&T, &T) -> Ordering
+{
+    // Handcrafted sort for chunks of 3
+    debug_assert!(s.len() == 3);
+    if compare(&s[0], &s[1]) == Ordering::Greater {
+        s.swap(0, 1);
+    }
+    if compare(&s[1], &s[2]) == Ordering::Greater {
+        if compare(&s[0], &s[2]) == Ordering::Greater {
+            rotate_right_1(&mut s[0 .. 3]);
+        } else {
+            s.swap(1, 2);
         }
+    }
+}
+
+fn sort2<T, F>(s: &mut [T], compare: &F)
+where
+    F: Fn(&T, &T) -> Ordering
+{
+    // Handcrafted sort for chunks of 2
+    debug_assert!(s.len() == 2);
+    if compare(&s[0], &s[1]) == Ordering::Greater {
+        s.swap(0, 1);
     }
 }
 
@@ -774,33 +786,34 @@ where
     F: Fn(&T, &T) -> Ordering,
     G: Fn(&T, &T) -> Ordering
 {
-    let length = s.len();
-    sort4(s, cmpleftright);
-    let mut sorted_size = 4;  // size of blocks already sorted
-    while sorted_size < length {
-        let merge_size = sorted_size * 2;
-        let mut start = 0;
-        let mut end = merge_size;
-        while end < length {
-            merge(
-                &mut s[start .. end],
-                sorted_size,
-                cmpleftright,
-                cmprightleft
-            );
-            start = end;
-            end += merge_size;
+    // Move backwards through the slice, sorting blocks of 4. When we have two sorted blocks,
+    // merge them into a block of 8.  When we have two sorted blocks of 8, merge them into a
+    // block of 16.  To do this, look at the start of each 4-block.  If it has a 0 in the 4's digit
+    // (0100), then it is an even block of 4 - add it to the following odd block of 4. Then check
+    // the 8's digit (1000). If it is an even block of 8, add it to the following odd block of 8.
+    // We check for the end of the slice, to avoid merging an even block into a non-existent block.
+    // We do this to be cache-friendly rather than sorting by 4's, then 8's, etc. reading the
+    // entire slice each time.
+    let end = s.len();
+    let rump = end % 4;
+    let mut start = end - rump;
+    match rump {
+        0 | 1 => (),
+        2 => sort2(&mut s[start ..], cmpleftright),
+        3 => sort3(&mut s[start ..], cmpleftright),
+        _ => unreachable!(),
+    }
+
+    while start > 0 {
+        let mut end = start;
+        start -= 4;
+        sort4(&mut s[start .. end], cmpleftright);
+        let mut size = 4usize;
+        while start & size == 0 && end < s.len() {
+            end = min(end + size, s.len());
+            merge(&mut s[start .. end], size, cmpleftright, cmprightleft);
+            size *= 2;
         }
-        // for tail, if right side contains at least one element, perform an additional merge
-        if start + sorted_size < length {
-            merge(
-                &mut s[start .. length],
-                sorted_size,
-                cmpleftright,
-                cmprightleft
-            );
-        }
-        sorted_size = merge_size;
     }
 }
 
