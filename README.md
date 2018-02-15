@@ -1005,3 +1005,185 @@ Method F2:
 - fewer moves when \|L\| + 1 < \|X\|
 
 This was implemented as Algorithm L. It has minimal effect on timings.
+
+To avoid rotates, try doing swaps of equal size.
+
+| S |     L     |    R    |
+|---|-----------|---------|
+|   | 1 3 5 7 9 | 2 4 6 8 |
+
+First, trim left and right sides
+
+| S |      L      |   R   |
+|---|-------------|-------|
+| 1 | 3 5 7 9 | 2 4 6 8 |
+
+Then search for insertion point of L<sub>0</sub> in R.
+
+| S |      L      |   R   |
+|---|-------------|-------|
+| 1 | 3 5 7 9 | 2 / 4 6 8 |
+
+Then swap the lower values from R with an equal block in L, moving the R blocks into S.
+
+| S |      L      |   R   |
+|---|-------------|-------|
+| 1 2 | 5 7 9 | 3 / 4 6 8 |
+
+Then merge the swapped L block into R. Note, this is recursive here. Keep a high-water mark for where the merge moves the highest value of L.
+
+| S |      L      |   R   |
+|---|-------------|-------|
+| 1 2 | 5 7 9 11 | 3 / 4 6 8 10 |
+
+Repeat.
+
+Search for insertion point of L<sub>0</sub> in R, using high-water mark to start search.
+
+| S |      L      |   R   |
+|---|-------------|-------|
+| 1 2 | 5 7 9 11 | 3 4 / 6 8 10 |
+
+Then swap the lower values from R with an equal block in L, moving the R blocks into S.
+
+| S |      L      |   R   |
+|---|-------------|-------|
+| 1 2 3 4 | 9 11 | 5 7 / 6 8 10 |
+
+Then merge the swapped L block into R
+
+| S |      L      |   R   |
+|---|-------------|-------|
+| 1 2 3 4 | 9 11 | 5 6 7 / 8 10 |
+
+When |L| < |X|, use rotation, and then reset L and R.
+
+| S |      L      |   R   |
+|---|-------------|-------|
+| 1 2 3 4 5 6 7 | 9 11 | 8 10 |
+
+Search for insertion point of L<sub>0</sub> in R, using high-water mark to start search.
+
+| S |      L      |   R   |
+|---|-------------|-------|
+| 1 2 3 4 5 6 7 | 9 11 | 8 / 10 |
+
+Then swap the lower values from R with an equal block in L, moving the R blocks into S.
+
+| S |      L      |   R   |
+|---|-------------|-------|
+| 1 2 3 4 5 6 7 8 | 11 | 9 / 10 |
+
+Then merge the swapped L block into R
+
+| S |      L      |   R   |
+|---|-------------|-------|
+| 1 2 3 4 5 6 7 8 | 11 | 9 / 10 |
+
+Search for insertion point of L<sub>0</sub> in R, using high-water mark to start search.
+
+| S |      L      |   R   |
+|---|-------------|-------|
+| 1 2 3 4 5 6 7 8 | 11 | 9 10 / |
+
+When |L| < |X|, use rotation, and then reset L and R.
+
+| S |      L      |   R   |
+|---|-------------|-------|
+| 1 2 3 4 5 6 7 8 9 10 | 11 | |
+
+Terminate when L or R is empty.
+
+This has a dysfunctional form when L is mostly sorted:
+
+| S |      L      |   R   |
+|---|-------------|-------|
+|   | 2 3 4 5 6 10 | 1 7 8 9 |
+
+First, trim left and right sides
+
+| S |      L      |   R   |
+|---|-------------|-------|
+|   | 2 3 4 5 6 10 | 1 7 8 9 |
+
+Then search for insertion point of L<sub>0</sub> in R.
+
+| S |      L      |   R   |
+|---|-------------|-------|
+|   | 2 3 4 5 6 10 | 1 / 7 8 9 |
+
+Then swap the lower values from R with an equal block in L, moving the R blocks into S.
+
+| S |      L      |   R   |
+|---|-------------|-------|
+| 1 | 3 4 5 6 10 | 2 / 7 8 9 |
+
+Then merge the swapped L block into R
+
+| S |      L      |   R   |
+|---|-------------|-------|
+| 1 | 3 4 5 6 10 | 2 7 8 9 |
+
+Then search for insertion point of L<sub>0</sub> in R.
+
+| S |      L      |   R   |
+|---|-------------|-------|
+| 1 | 3 4 5 6 10 | 2 / 7 8 9 |
+
+Then swap the lower values from R with an equal block in L, moving the R blocks into S.
+
+| S |      L      |   R   |
+|---|-------------|-------|
+| 1 2 | 4 5 6 10 | 3 / 7 8 9 |
+
+This continues, with each single value being bounced up into R, and then down into S.
+
+This can also occur with larger subsequences, e.g.
+
+| S |      L      |   R   |
+|---|-------------|-------|
+|   | 3 4 5 6 7 10 | 1 2 / 8 9 |
+
+In this case, we want to rotate the block to put the low L values in place.
+We can do this by looking for R'[0] in L
+
+Algorithm M:
+
+```
+hw = 1
+while |L| > 1 and |R| > 1:
+	find X in R[hw..] where X[i] < L[0]
+	if |X| == |R|:
+		rotate(L, R)
+		return # merge completed
+	find Z in L where Z[i] <= R'[0]
+	if |L| <= |X|:
+		# l0,l1,...,lz,(rx+1),lz+1,...,l|L| / r0,r1,...,rx,(l0),rx+1,...,r|R|
+		rotate L-X by |X|
+		# r0,r1,...,rx,l0,l1,...,lz,(rx+1),lz+1,...,l|L| / rx+1,...,r|R|
+		add |X| + |Z| elements to S # l0+=|X|+|Z|, r0+=|X|
+		# (rx+1),lz+1,...,l|L| / rx+1,...,r|R|
+		# R[0] < L[0]
+		hw = 1
+	elif |Z| < |X|:
+		# l0,l1,...,lz,(rx+1),lz+1,...,lx,lx+1,...,l|L| / r0,r1,...,rx,(l0),rx+1,...,r|R|
+		swap |X| elements from L with X
+		# r0,r1,...,rx,(l0),lx+1,...,l|L| / l0,l1,...,lz,(rx+1),lz+1,...,lx,rx+1,...,r|R|
+		add |X| elements to S # l0+=|X|
+		# lx+1,...,l|L| / l0,l1,...,lz,(rx+1),lz+1,...,lx,rx+1,...,r|R|
+		# first |Z| elements of X' < rx+1
+		hw = find lx in rx+1..r|R|
+		# lx+1,...,l|L| / l0,l1,...,lz,(rx+1),lz+1,...,lx,rx+1,,...,ry,(lx),ry+1,...,r|R|
+		merge_trimmed(lz+1..ry)
+	else:
+		# l0,l1,...,lx,lx+1,...,lz,(rx+1),lz+1,...,l|L| / r0,r1,...,rx,(l0),rx+1,...,r|R|
+		swap |X| elements from RHS of Z with X
+		# l0,l1,...,lx,r0,r1,...,rx,(l0),lz+1,...,l|L| / lx+1,...,lz,rx+1,...,r|R|
+		rotate Z by |Z| - |X|
+		# r0,r1,...,rx,l0,l1,...,lx,lz+1,...,l|L| / lx+1,...,lz,rx+1,...,r|R|
+		add |Z| elements to S # l0+=|Z|
+		# lz+1,...,l|L| / lx+1,...,lz,rx+1,...,r|R|
+		# R already in order and we know rx+1 < lz+1
+		hw = |X| + 1
+rotate(L, R)
+```
