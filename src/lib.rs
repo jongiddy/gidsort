@@ -1,4 +1,5 @@
 #![feature(stmt_expr_attributes)]
+#![allow(dead_code)]
 
 extern crate gcd;
 
