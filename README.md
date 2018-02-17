@@ -1197,3 +1197,5 @@ We can add Algorithm I (rewritten to demonstrate its similarity) as a terminatin
 Since Algorithm M is faster than Algorithm I, we make the level of recursion a parameter. Setting it to 1 gives Algorithm J, which uses Algorithm M calling Algorithm I for merging. Setting it to 0 just gives Algorithm I, and setting it higher gives multiple levels of Algorithm M before Algorithm I is used.
 
 Testing shows that the timings improve with more levels of Algorithm M.
+
+From the original algorithms, we can also see that L can be rotated when \|L\| < \|X\| + \|Z\|, which keeps the algorithm out of \|Z\| < \|X\| section more often.

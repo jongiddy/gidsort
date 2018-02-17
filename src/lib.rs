@@ -343,7 +343,7 @@ where
         // - this search relies on invariant |L| > 1, tested in loop condition
         let zlen = gallop_right(&s[split + xlen], &s[left + 1 .. split - 1], cmprightleft) + 1;
 
-        if llen!() <= xlen {
+        if llen!() <= xlen + zlen {
             rotate(&mut s[left .. split + xlen], xlen);
             left += xlen + zlen;
             split += xlen;
@@ -406,7 +406,7 @@ where
         // - this search relies on invariant |L| > 1, tested in loop condition
         let zlen = gallop_right(&s[split + xlen], &s[left + 1 .. split - 1], cmprightleft) + 1;
 
-        if llen!() <= xlen {
+        if llen!() <= xlen + zlen {
             rotate(&mut s[left .. split + xlen], xlen);
             left += xlen + zlen;
             split += xlen;
