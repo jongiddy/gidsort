@@ -11,12 +11,18 @@ use gcd::Gcd;
 #[macro_use]
 extern crate quickcheck;
 
+pub const MAX_RECURSION_LIMIT: u32 = <u32>::max_value();
 
 // Tuning parameters:
 
 // The algorithm may use this many bytes on the stack as a buffer.  Only one buffer of this size
 // exists on the stack at any time.
 const STACK_OBJECT_SIZE: usize = 2048;
+
+// The levels of recursion to allow. The recursive algorithm is O(log2(n)) in memory usage.
+// Setting a limit to the recursion makes it O(1). Lower values use less stack, but are likely to
+// be slower.  Values from 0 .. MAX_RECURSION_LIMIT are valid.
+const RECURSION_LIMIT: u32 = MAX_RECURSION_LIMIT;
 
 // The maximum GCD for which reverse is used to rotate. Above this value, block swapping is used.
 const ROTATE_REVERSE_MAX: usize = 4;
@@ -281,23 +287,33 @@ where
     Some((left, right))
 }
 
-fn merge<T, F, G>(s: &mut [T], split: usize, cmpleftright: &F, cmprightleft: &G)
+fn merge<T, F, G>(s: &mut [T], split: usize, cmpleftright: &F, cmprightleft: &G, recurse: u32)
 where
     F: Fn(&T, &T) -> Ordering,
     G: Fn(&T, &T) -> Ordering
 {
     if let Some((left, right)) = trim(s, split, cmpleftright, cmprightleft) {
-        merge_trimmed(&mut s[left .. right], split - left, cmpleftright, cmprightleft);
+        merge_trimmed(&mut s[left .. right], split - left, cmpleftright, cmprightleft, recurse);
     }
 }
 
-fn merge_trimmed<T, F, G>(s: &mut [T], split: usize, cmpleftright: &F, cmprightleft: &G)
+fn merge_trimmed<T, F, G>(s: &mut [T], split: usize, cmpleftright: &F, cmprightleft: &G, recurse: u32)
 where
     F: Fn(&T, &T) -> Ordering,
     G: Fn(&T, &T) -> Ordering
 {
-    // The slice to be sorted is divided into S0 | L | M | R | S1
-    // The indexes into the slice are l0, m0, r0, r1
+    if recurse == 0 {
+        merge_final(s, split, cmpleftright, cmprightleft);
+    } else {
+        merge_recurse(s, split, cmpleftright, cmprightleft, recurse - 1);
+    }
+}
+
+fn merge_recurse<T, F, G>(s: &mut [T], split: usize, cmpleftright: &F, cmprightleft: &G, recurse: u32)
+where
+    F: Fn(&T, &T) -> Ordering,
+    G: Fn(&T, &T) -> Ordering
+{
     let mut left = 0;
     let mut split = split;
     let right = s.len();
@@ -342,8 +358,64 @@ where
                 &s[split + xlen + 1 .. right],
                 cmpleftright
             ) + split + xlen + 1;
-            merge_trimmed(&mut s[ml .. mr], ms, cmpleftright, cmprightleft);
+            merge_trimmed(&mut s[ml .. mr], ms, cmpleftright, cmprightleft, recurse);
             highwater = mr - split;
+        } else {
+            swap_ends(&mut s[left + zlen - xlen .. split + xlen], xlen);
+            rotate(&mut s[left .. left + zlen], xlen);
+            left += zlen;
+            highwater = xlen + 1;
+        }
+    }
+    // since r_0..r_highwater are < l_0, we just need to swap L and R
+    // since l_max is largest value, if |L| = 1, we just need to swap L and R
+    rotate(&mut s[left .. right], rlen!());
+}
+
+fn merge_final<T, F, G>(s: &mut [T], split: usize, cmpleftright: &F, cmprightleft: &G)
+where
+    F: Fn(&T, &T) -> Ordering,
+    G: Fn(&T, &T) -> Ordering
+{
+    let mut left = 0;
+    let mut split = split;
+    let right = s.len();
+
+    macro_rules! llen {() => (split - left)}
+    macro_rules! rlen {() => (right - split)}
+
+    // 1. |L| > 0
+    debug_assert!(llen!() > 0);
+    // 2. |R| > 0
+    debug_assert!(rlen!() > 0);
+    // 3. l_max is max value
+    debug_assert!(cmprightleft(&s[right - 1], &s[split - 1]) == Ordering::Less);
+    // 4. r_0 is min value
+    debug_assert!(cmpleftright(&s[left], &s[split]) == Ordering::Greater);
+
+    let mut highwater = 1; // elements of R known to be < l_0
+
+    while llen!() > 1 && rlen!() > highwater {
+        let xlen = gallop_right(&s[left], &s[split + highwater .. right], cmpleftright) + highwater;
+        if xlen == rlen!() {
+            break
+        }
+        // find Z in L where Z[i] < R'[0]
+        // - Since L[max] > R[max], exclude L[max] from search
+        // - Since R[split + xlen] > L[0] from previous search, exclude L[0] from search
+        // - this search relies on invariant |L| > 1, tested in loop condition
+        let zlen = gallop_right(&s[split + xlen], &s[left + 1 .. split - 1], cmprightleft) + 1;
+
+        if llen!() <= xlen {
+            rotate(&mut s[left .. split + xlen], xlen);
+            left += xlen + zlen;
+            split += xlen;
+            highwater = 1;
+        } else if zlen < xlen {
+            swap_ends(&mut s[left .. split + zlen], zlen);
+            rotate(&mut s[split .. split + xlen], xlen - zlen);
+            left += zlen;
+            highwater = xlen + 1;
         } else {
             swap_ends(&mut s[left + zlen - xlen .. split + xlen], xlen);
             rotate(&mut s[left .. left + zlen], xlen);
@@ -426,7 +498,7 @@ where
     }
 }
 
-fn sort_by_ordering<T, F, G>(s: &mut [T], cmpleftright: &F, cmprightleft: &G)
+fn sort_by_ordering<T, F, G>(s: &mut [T], cmpleftright: &F, cmprightleft: &G, recurse: u32)
 where
     F: Fn(&T, &T) -> Ordering,
     G: Fn(&T, &T) -> Ordering
@@ -456,7 +528,7 @@ where
         let mut size = 4usize;
         while start & size == 0 && end < s.len() {
             end = min(end + size, s.len());
-            merge(&mut s[start .. end], size, cmpleftright, cmprightleft);
+            merge(&mut s[start .. end], size, cmpleftright, cmprightleft, recurse);
             size *= 2;
         }
     }
@@ -469,7 +541,8 @@ where
     sort_by_ordering(
         s,
         &|ref a, ref b|{compare(&a, &b).then(Ordering::Less)},
-        &|ref a, ref b|{compare(&a, &b).then(Ordering::Greater)}
+        &|ref a, ref b|{compare(&a, &b).then(Ordering::Greater)},
+        RECURSION_LIMIT
     )
 }
 
@@ -585,7 +658,7 @@ mod tests {
         let mut s: [i32; 0] = [];
         let count = Cell::new(0);
         let compare = |a: &i32, b: &i32|{count.set(count.get() + 1); i32::cmp(&a, &b)};
-        super::merge(&mut s, 0, &compare, &compare);
+        super::merge(&mut s, 0, &compare, &compare, super::MAX_RECURSION_LIMIT);
         assert_eq!(count.get(), 0);
     }
 
@@ -594,7 +667,7 @@ mod tests {
         let mut s = [1];
         let count = Cell::new(0);
         let compare = |a: &i32, b: &i32|{count.set(count.get() + 1); i32::cmp(&a, &b)};
-        super::merge(&mut s, 0, &compare, &compare);
+        super::merge(&mut s, 0, &compare, &compare, super::MAX_RECURSION_LIMIT);
         assert_eq!(count.get(), 0);
         assert_eq!(s[0], 1);
     }
@@ -604,7 +677,7 @@ mod tests {
         let mut s = [1];
         let count = Cell::new(0);
         let compare = |a: &i32, b: &i32|{count.set(count.get() + 1); i32::cmp(&a, &b)};
-        super::merge(&mut s, 1, &compare, &compare);
+        super::merge(&mut s, 1, &compare, &compare, super::MAX_RECURSION_LIMIT);
         assert_eq!(count.get(), 0);
         assert_eq!(s[0], 1);
     }
@@ -614,7 +687,7 @@ mod tests {
         let mut s = [1, 2];
         let count = Cell::new(0);
         let compare = |a: &i32, b: &i32|{count.set(count.get() + 1); i32::cmp(&a, &b)};
-        super::merge(&mut s, 1, &compare, &compare);
+        super::merge(&mut s, 1, &compare, &compare, super::MAX_RECURSION_LIMIT);
         assert_eq!(count.get(), 1);
         assert_eq!(s[0], 1);
         assert_eq!(s[1], 2);
@@ -625,7 +698,7 @@ mod tests {
         let mut s = [2, 1];
         let count = Cell::new(0);
         let compare = |a: &i32, b: &i32|{count.set(count.get() + 1); i32::cmp(&a, &b)};
-        super::merge(&mut s, 1, &compare, &compare);
+        super::merge(&mut s, 1, &compare, &compare, super::MAX_RECURSION_LIMIT);
         // One compare required, but there are 2 debug_assert that compare
         assert!(count.get() <= 3);
         assert_eq!(s[0], 1);
@@ -637,7 +710,7 @@ mod tests {
         let mut s = [7, 0, 1, 2, 3, 4, 5, 6, 8, 9, 10];
         let count = Cell::new(0);
         let compare = |a: &usize, b: &usize|{count.set(count.get() + 1); usize::cmp(&a, &b)};
-        super::merge(&mut s, 1, &compare, &compare);
+        super::merge(&mut s, 1, &compare, &compare, super::MAX_RECURSION_LIMIT);
         // assert_eq!(count.get(), 4);
         for (i, elem) in s.iter().enumerate() {
             assert_eq!(*elem, i);
@@ -650,7 +723,7 @@ mod tests {
         let count = Cell::new(0);
         let leftlen = s.len() - 1;
         let compare = |a: &usize, b: &usize|{count.set(count.get() + 1); usize::cmp(&a, &b)};
-        super::merge(&mut s, leftlen, &compare, &compare);
+        super::merge(&mut s, leftlen, &compare, &compare, super::MAX_RECURSION_LIMIT);
         // assert_eq!(count.get(), 5);
         for (i, elem) in s.iter().enumerate() {
             assert_eq!(*elem, i);
@@ -663,7 +736,7 @@ mod tests {
         let count = Cell::new(0);
         let leftlen = s.len() / 2;
         let compare = |a: &usize, b: &usize|{count.set(count.get() + 1); usize::cmp(&a, &b)};
-        super::merge(&mut s, leftlen, &compare, &compare);
+        super::merge(&mut s, leftlen, &compare, &compare, super::MAX_RECURSION_LIMIT);
         assert_eq!(count.get(), 1);
         for (i, elem) in s.iter().enumerate() {
             assert_eq!(*elem, i);
@@ -677,7 +750,7 @@ mod tests {
             Nc(1), Nc(3), Nc(5), Nc(7), Nc(9), Nc(11), Nc(13), Nc(15)
         ];
         let leftlen = s.len() / 2;
-        super::merge(&mut s, leftlen, &Nc::cmp, &Nc::cmp);
+        super::merge(&mut s, leftlen, &Nc::cmp, &Nc::cmp, super::MAX_RECURSION_LIMIT);
         for (i, elem) in s.iter().enumerate() {
             assert_eq!(*elem, Nc(i as i32));
         }

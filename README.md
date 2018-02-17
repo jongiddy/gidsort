@@ -1187,3 +1187,13 @@ while |L| > 1 and |R| > 1:
 		hw = |X| + 1
 rotate(L, R)
 ```
+
+This is a relatively big improvement in sort times.
+Note that it follows the same structure as Algorithm I - the insertion-merge algorithm.
+However, it always moves the maximum of \|X\| or \|Z\| items into place rather than just the \|Z\| items for Algorithm I.
+On the other hand, being recursive, this algorithm does not have O(1) memory usage.
+
+We can add Algorithm I (rewritten to demonstrate its similarity) as a terminating step to re-create Algorithm J.
+Since Algorithm M is faster than Algorithm I, we make the level of recursion a parameter. Setting it to 1 gives Algorithm J, which uses Algorithm M calling Algorithm I for merging. Setting it to 0 just gives Algorithm I, and setting it higher gives multiple levels of Algorithm M before Algorithm I is used.
+
+Testing shows that the timings improve with more levels of Algorithm M.
