@@ -68,7 +68,6 @@ where
                 p2 *= 2;
             },
             Ordering::Equal => {
-                #![cold]
                 return trial;
             }
         }
@@ -99,7 +98,6 @@ where
                 lo = trial + 1;
             },
             Ordering::Equal => {
-                #![cold]
                 return trial;
             },
         }
@@ -326,9 +324,9 @@ where
     // 2. |R| > 0
     debug_assert!(rlen!() > 0);
     // 3. l_max is max value
-    debug_assert!(cmprightleft(&s[right - 1], &s[split - 1]) == Ordering::Less);
+    debug_assert!(cmprightleft(&s[right - 1], &s[split - 1]) != Ordering::Greater);
     // 4. r_0 is min value
-    debug_assert!(cmpleftright(&s[left], &s[split]) == Ordering::Greater);
+    debug_assert!(cmpleftright(&s[left], &s[split]) != Ordering::Less);
 
     let mut highwater = 1; // elements of R known to be < l_0
 
@@ -546,11 +544,30 @@ where
     )
 }
 
+pub fn sort_unstable_by<T, F>(s: &mut [T], compare: &F)
+where
+    F: Fn(&T, &T) -> Ordering
+{
+    sort_by_ordering(
+        s,
+        &|ref a, ref b|{compare(&a, &b)},
+        &|ref a, ref b|{compare(&a, &b)},
+        RECURSION_LIMIT
+    )
+}
+
 pub fn sort<T>(s: &mut [T])
 where
     T: Ord
 {
     sort_by(s, &T::cmp);
+}
+
+pub fn sort_unstable<T>(s: &mut [T])
+where
+    T: Ord
+{
+    sort_unstable_by(s, &T::cmp);
 }
 
 #[cfg(test)]
@@ -994,6 +1011,19 @@ mod tests {
     }
 
     quickcheck! {
+        fn sort_stable(vec: Vec<u32>) -> bool {
+            let mut vec = vec.clone();
+            let mut v = vec.drain(..).enumerate().collect::<Vec<(usize, u32)>>();
+            super::sort_by(&mut v, &|&(_, a), &(_, b)| a.cmp(&b));
+            v.windows(2).all(|v| v[0].1.cmp(&v[1].1).then(v[0].0.cmp(&v[1].0)) == Ordering::Less)
+        }
+
+        fn sort_unstable(vec: Vec<u32>) -> bool {
+            let mut s = vec.clone();
+            super::sort(&mut s);
+            s.windows(2).all(|v| v[0] <= v[1])
+        }
+
         fn sort_i32(vec: Vec<i32>) -> bool {
             let mut s = vec.clone();
             super::sort(&mut s);

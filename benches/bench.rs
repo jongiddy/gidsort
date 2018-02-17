@@ -176,7 +176,7 @@ unstable_sort_bench!(large_big_random_3bcda48a3_u, gen_big_random, 10000);
 unstable_sort_bench!(large_big_ascending_3bcda48a3_u, gen_big_ascending, 10000);
 unstable_sort_bench!(large_big_descending_3bcda48a3_u, gen_big_descending, 10000);
 
-macro_rules! new_sort_bench {
+macro_rules! new_stable {
     ($name:ident, $gen:expr, $len:expr) => {
         #[bench]
         fn $name(b: &mut Bencher) {
@@ -186,28 +186,64 @@ macro_rules! new_sort_bench {
     }
 }
 
-new_sort_bench!(small_random_gidsort, gen_random, 10);
-new_sort_bench!(small_ascending_gidsort, gen_ascending, 10);
-new_sort_bench!(small_descending_gidsort, gen_descending, 10);
+new_stable!(small_random_stable, gen_random, 10);
+new_stable!(small_ascending_stable, gen_ascending, 10);
+new_stable!(small_descending_stable, gen_descending, 10);
 
-new_sort_bench!(small_big_random_gidsort, gen_big_random, 10);
-new_sort_bench!(small_big_ascending_gidsort, gen_big_ascending, 10);
-new_sort_bench!(small_big_descending_gidsort, gen_big_descending, 10);
+new_stable!(small_big_random_stable, gen_big_random, 10);
+new_stable!(small_big_ascending_stable, gen_big_ascending, 10);
+new_stable!(small_big_descending_stable, gen_big_descending, 10);
 
-new_sort_bench!(medium_random_gidsort, gen_random, 100);
-new_sort_bench!(medium_ascending_gidsort, gen_ascending, 100);
-new_sort_bench!(medium_descending_gidsort, gen_descending, 100);
+new_stable!(medium_random_stable, gen_random, 100);
+new_stable!(medium_ascending_stable, gen_ascending, 100);
+new_stable!(medium_descending_stable, gen_descending, 100);
 
-new_sort_bench!(large_short_runs_gidsort, gen_short_runs, 10000);
-new_sort_bench!(large_random_gidsort, gen_random, 10000);
-new_sort_bench!(large_ascending_gidsort, gen_ascending, 10000);
-new_sort_bench!(large_descending_gidsort, gen_descending, 10000);
-new_sort_bench!(large_mostly_ascending_gidsort, gen_mostly_ascending, 10000);
-new_sort_bench!(large_mostly_descending_gidsort, gen_mostly_descending, 10000);
+new_stable!(large_short_runs_stable, gen_short_runs, 10000);
+new_stable!(large_random_stable, gen_random, 10000);
+new_stable!(large_ascending_stable, gen_ascending, 10000);
+new_stable!(large_descending_stable, gen_descending, 10000);
+new_stable!(large_mostly_ascending_stable, gen_mostly_ascending, 10000);
+new_stable!(large_mostly_descending_stable, gen_mostly_descending, 10000);
 
-new_sort_bench!(nightmare_gidsort, gen_nightmare, 1);
-new_sort_bench!(marenight_gidsort, gen_marenight, 1);
+new_stable!(nightmare_stable, gen_nightmare, 1);
+new_stable!(marenight_stable, gen_marenight, 1);
 
-new_sort_bench!(large_big_random_gidsort, gen_big_random, 10000);
-new_sort_bench!(large_big_ascending_gidsort, gen_big_ascending, 10000);
-new_sort_bench!(large_big_descending_gidsort, gen_big_descending, 10000);
+new_stable!(large_big_random_stable, gen_big_random, 10000);
+new_stable!(large_big_ascending_stable, gen_big_ascending, 10000);
+new_stable!(large_big_descending_stable, gen_big_descending, 10000);
+
+macro_rules! new_unstable {
+    ($name:ident, $gen:expr, $len:expr) => {
+        #[bench]
+        fn $name(b: &mut Bencher) {
+            b.iter(|| gidsort::sort_unstable(&mut $gen($len)));
+            b.bytes = $len * mem::size_of_val(&$gen(1)[0]) as u64;
+        }
+    }
+}
+
+new_unstable!(small_random_unstable, gen_random, 10);
+new_unstable!(small_ascending_unstable, gen_ascending, 10);
+new_unstable!(small_descending_unstable, gen_descending, 10);
+
+new_unstable!(small_big_random_unstable, gen_big_random, 10);
+new_unstable!(small_big_ascending_unstable, gen_big_ascending, 10);
+new_unstable!(small_big_descending_unstable, gen_big_descending, 10);
+
+new_unstable!(medium_random_unstable, gen_random, 100);
+new_unstable!(medium_ascending_unstable, gen_ascending, 100);
+new_unstable!(medium_descending_unstable, gen_descending, 100);
+
+new_unstable!(large_short_runs_unstable, gen_short_runs, 10000);
+new_unstable!(large_random_unstable, gen_random, 10000);
+new_unstable!(large_ascending_unstable, gen_ascending, 10000);
+new_unstable!(large_descending_unstable, gen_descending, 10000);
+new_unstable!(large_mostly_ascending_unstable, gen_mostly_ascending, 10000);
+new_unstable!(large_mostly_descending_unstable, gen_mostly_descending, 10000);
+
+new_unstable!(nightmare_unstable, gen_nightmare, 1);
+new_unstable!(marenight_unstable, gen_marenight, 1);
+
+new_unstable!(large_big_random_unstable, gen_big_random, 10000);
+new_unstable!(large_big_ascending_unstable, gen_big_ascending, 10000);
+new_unstable!(large_big_descending_unstable, gen_big_descending, 10000);
