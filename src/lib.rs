@@ -1,4 +1,5 @@
 #![feature(stmt_expr_attributes)]
+#![feature(swap_nonoverlapping)]
 
 extern crate gcd;
 
@@ -112,11 +113,19 @@ fn swap_ends<T>(s: &mut [T], k: usize) {
     // Swap front k items of sequence with back k items
     debug_assert!(k <= s.len() / 2);
     let b = s.len() - k;
-    for i in 0..k {
+    if k * std::mem::size_of::<T>() < 128 {
+        for i in 0..k {
+            unsafe {
+                let pa: *mut T = s.get_unchecked_mut(i);
+                let pb: *mut T = s.get_unchecked_mut(b + i);
+                std::ptr::swap(pa, pb);
+            }
+        }
+    } else {
         unsafe {
-            let pa: *mut T = s.get_unchecked_mut(i);
-            let pb: *mut T = s.get_unchecked_mut(b + i);
-            std::ptr::swap(pa, pb);
+            let pa: *mut T = s.get_unchecked_mut(0);
+            let pb: *mut T = s.get_unchecked_mut(b);
+            std::ptr::swap_nonoverlapping(pa, pb, k);
         }
     }
 }
