@@ -183,7 +183,7 @@ fn rotate_left_shift<T>(s: &mut [T], llen: usize) {
     debug_assert!(llen * std::mem::size_of::<T>() <= STACK_OBJECT_SIZE);
     let rlen = s.len() - llen;
     unsafe {
-        // size_of is not const: https://github.com/rust-lang/rfcs/issues/1144
+        // size_of cannot be used to size an array: https://github.com/rust-lang/rust/issues/43408
         // let mut tmp: [T; STACK_OBJECT_SIZE / std::mem::size_of::<T>()] = std::mem::uninitialized();
         // There's no way to express alignment: https://github.com/rust-lang/rfcs/issues/325
         // let mut tmp: [u8; STACK_OBJECT_SIZE] = std::mem::uninitialized();
