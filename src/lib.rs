@@ -179,51 +179,55 @@ fn rotate_gcd<T>(s: &mut [T], k: usize) {
     }
 }
 
-fn rotate_left_shift<T>(s: &mut [T], llen: usize) {
-    debug_assert!(llen * std::mem::size_of::<T>() <= STACK_OBJECT_SIZE);
-    let rlen = s.len() - llen;
-    unsafe {
+macro_rules! stack_array_max {
+    ( $type:ty ) => {
+        STACK_OBJECT_SIZE / std::mem::size_of::<T>()
+    };
+}
+
+macro_rules! stack_array_unsafe {
+    ( [ $type:ty ; $len:expr ] ) => {{
         // size_of cannot be used to size an array: https://github.com/rust-lang/rust/issues/43408
         // let mut tmp: [T; STACK_OBJECT_SIZE / std::mem::size_of::<T>()] = std::mem::uninitialized();
         // There's no way to express alignment: https://github.com/rust-lang/rfcs/issues/325
         // let mut tmp: [u8; STACK_OBJECT_SIZE] = std::mem::uninitialized();
-        // However, using u8's also solves a potential problem.  If tmp is [T] and T is Drop, then
-        // we need to use mem::forget to ensure the duplicated T's are not dropped.  This is easy,
-        // as long as the code cannot panic.  In a panic, the forget is not run, but and drop still
-        // runs.  There's a NoDrop trick using unstable unions, but using a type (like u8) that
-        // is not Drop and then casting a pointer also prevents T::drop being called.
+        // Using primitive non-Drop types also means we don't need to mem::forget or ManuallyDrop
         // So, using u64 to improve alignment, this seems to be the best we can do right now:
+        debug_assert!($len * std::mem::size_of::<$type>() <= STACK_OBJECT_SIZE);
         let mut tmp: [u64; STACK_OBJECT_SIZE / 8] = std::mem::uninitialized();
+        tmp
+    }};
+}
+
+fn rotate_left_shift<T>(s: &mut [T], llen: usize) {
+    let rlen = s.len() - llen;
+    unsafe {
+        let mut tmp = stack_array_unsafe!([T; llen]);
         let t = tmp.as_mut_ptr() as *mut T;
         let src = s.as_ptr();
         let dst = s.as_mut_ptr();
         std::ptr::copy_nonoverlapping(src, t, llen);
         std::ptr::copy(src.offset(llen as isize), dst, rlen);
         std::ptr::copy_nonoverlapping(t, dst.offset(rlen as isize), llen);
-        // forget not needed but keeping it here to remind us in case tmp creation changes:
-        // std::mem::forget(tmp);
     }
 }
 
 fn rotate_right_shift<T>(s: &mut [T], rlen: usize) {
-    debug_assert!(rlen * std::mem::size_of::<T>() <= STACK_OBJECT_SIZE);
     let llen = s.len() - rlen;
     unsafe {
-        let mut tmp: [u64; STACK_OBJECT_SIZE / 8] = std::mem::uninitialized();
+        let mut tmp = stack_array_unsafe!([T; rlen]);
         let t = tmp.as_mut_ptr() as *mut T;
         let src = s.as_ptr();
         let dst = s.as_mut_ptr();
         std::ptr::copy_nonoverlapping(src.offset(llen as isize), t, rlen);
         std::ptr::copy(src, dst.offset(rlen as isize), llen);
         std::ptr::copy_nonoverlapping(t, dst, rlen);
-        // std::mem::forget(tmp);
     }
 }
 
 fn rotate<T>(s: &mut [T], rlen: usize) {
     // Rotate the last rlen elements to the front of the slice.
     // given a slice of 0..n, move n-rlen..n to front and 0..n-rlen to end
-    let max_rotate_shift: usize = STACK_OBJECT_SIZE / std::mem::size_of::<T>();
     let length = s.len();
     debug_assert!(rlen <= length);
     let llen = length - rlen;
@@ -232,13 +236,13 @@ fn rotate<T>(s: &mut [T], rlen: usize) {
     }
     match llen.cmp(&rlen) {
         Ordering::Less => {
-            if llen <= max_rotate_shift {
+            if llen <= stack_array_max!(T) {
                 rotate_left_shift(s, llen);
                 return
             }
         },
         Ordering::Greater => {
-            if rlen <= max_rotate_shift {
+            if rlen <= stack_array_max!(T) {
                 rotate_right_shift(s, rlen);
                 return
             }
