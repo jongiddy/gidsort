@@ -79,15 +79,15 @@ where
     // lo-hi contains 2^n - 1 elements containing the correct position.  2^n - 1 elements gives us
     // a balanced binary tree.  Perform binary search to find the final insertion position.
     debug_assert!(hi == length || (hi - lo + 1).is_power_of_two());
-    binary_search(value, &buffer[lo .. hi], compare) + lo
+    binary_search(value, &buffer[.. hi], lo, compare)
 }
 
-fn binary_search<T, F>(value: &T, buffer: &[T], compare: &F) -> usize
+fn binary_search<T, F>(value: &T, buffer: &[T], start: usize, compare: &F) -> usize
 where
     F: Fn(&T, &T) -> Ordering
 {
     let length = buffer.len();
-    let mut lo = 0;       // lowest candidate
+    let mut lo = start;   // lowest candidate
     let mut hi = length;  // highest candidate
     while hi > lo {
         let trial = lo + (hi - lo) / 2;
@@ -287,7 +287,7 @@ where
     }
     // Trim off in-position high values of R to leave l[max] as largest value
     // From above, r[0] <= l[max], so exclude r[0] from search.
-    let right = binary_search(&s[split - 1], &s[split + 1 .. slen], cmpleftright) + split + 1;
+    let right = binary_search(&s[split - 1], &s[split ..], 1, cmpleftright) + split;
 
     // Trim off in-position low values of L to leave r[0] as smallest value
     // From above, l[max] >= r[0], so exclude l[max] from search.
@@ -863,50 +863,50 @@ mod tests {
 
     #[test]
     fn binary_search_0() {
-        assert_eq!(super::binary_search(&Nc(3), &[], &Nc::cmp), 0)
+        assert_eq!(super::binary_search(&Nc(3), &[], 0, &Nc::cmp), 0)
     }
 
     #[test]
     fn binary_search_1_before() {
-        assert_eq!(super::binary_search(&Nc(1), &[Nc(2)], &Nc::cmp), 0)
+        assert_eq!(super::binary_search(&Nc(1), &[Nc(2)], 0, &Nc::cmp), 0)
     }
     #[test]
     fn binary_search_1_after() {
-        assert_eq!(super::binary_search(&Nc(3), &[Nc(2)], &Nc::cmp), 1)
+        assert_eq!(super::binary_search(&Nc(3), &[Nc(2)], 0, &Nc::cmp), 1)
     }
 
     #[test]
     fn binary_search_2_before() {
-        assert_eq!(super::binary_search(&Nc(1), &[Nc(2), Nc(4)], &Nc::cmp), 0)
+        assert_eq!(super::binary_search(&Nc(1), &[Nc(2), Nc(4)], 0, &Nc::cmp), 0)
     }
     #[test]
     fn binary_search_2_middle() {
-        assert_eq!(super::binary_search(&Nc(3), &[Nc(2), Nc(4)], &Nc::cmp), 1)
+        assert_eq!(super::binary_search(&Nc(3), &[Nc(2), Nc(4)], 0, &Nc::cmp), 1)
     }
     #[test]
     fn binary_search_2_after() {
-        assert_eq!(super::binary_search(&Nc(5), &[Nc(2), Nc(4)], &Nc::cmp), 2)
+        assert_eq!(super::binary_search(&Nc(5), &[Nc(2), Nc(4)], 0, &Nc::cmp), 2)
     }
 
     #[test]
     fn binary_search_3_before() {
-        assert_eq!(super::binary_search(&Nc(1), &[Nc(2), Nc(4), Nc(6)], &Nc::cmp), 0)
+        assert_eq!(super::binary_search(&Nc(1), &[Nc(2), Nc(4), Nc(6)], 0, &Nc::cmp), 0)
     }
     #[test]
     fn binary_search_3_lt() {
         // Default to Ordering::Less if the value should be inserted before equal values
         let compare = |a: &Nc, b: &Nc|{Nc::cmp(&a, &b).then(Ordering::Less)};
-        assert_eq!(super::binary_search(&Nc(4), &[Nc(2), Nc(4), Nc(6)], &compare), 1)
+        assert_eq!(super::binary_search(&Nc(4), &[Nc(2), Nc(4), Nc(6)], 0, &compare), 1)
     }
     #[test]
     fn binary_search_3_le() {
         // Default to Ordering::Greater if value should be inserted after equal values
         let compare = |a: &Nc, b: &Nc|{Nc::cmp(&a, &b).then(Ordering::Greater)};
-        assert_eq!(super::binary_search(&Nc(4), &[Nc(2), Nc(4), Nc(6)], &compare), 2)
+        assert_eq!(super::binary_search(&Nc(4), &[Nc(2), Nc(4), Nc(6)], 0, &compare), 2)
     }
     #[test]
     fn binary_search_3_after() {
-        assert_eq!(super::binary_search(&Nc(7), &[Nc(2), Nc(4), Nc(6)], &Nc::cmp), 3)
+        assert_eq!(super::binary_search(&Nc(7), &[Nc(2), Nc(4), Nc(6)], 0, &Nc::cmp), 3)
     }
 
     #[test]
@@ -915,7 +915,7 @@ mod tests {
         let mut profile = Vec::new();
         for v in 0 .. s.len() + 1 {
             let count = Cell::new(0);
-            assert_eq!(super::binary_search(&v, &s, &|&a, &b|{count.set(count.get() + 1); usize::cmp(&a, &b).then(Ordering::Less)}), v);
+            assert_eq!(super::binary_search(&v, &s, 0, &|&a, &b|{count.set(count.get() + 1); usize::cmp(&a, &b).then(Ordering::Less)}), v);
             profile.push(count.get());
         }
         assert_eq!(profile, vec![4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4])
@@ -925,7 +925,7 @@ mod tests {
     fn binary_search_stable() {
         let s = [1, 5, 5, 5, 5, 5, 8];
         let count = Cell::new(0);
-        super::binary_search(&5, &s, &|&a, &b|{count.set(count.get() + 1); i32::cmp(&a, &b).then(Ordering::Less)});
+        super::binary_search(&5, &s, 0, &|&a, &b|{count.set(count.get() + 1); i32::cmp(&a, &b).then(Ordering::Less)});
         assert_eq!(count.get(), 3);
     }
 
@@ -935,7 +935,7 @@ mod tests {
         // Since first comparsion finds matching value, it will return immediately.
         let s = [1, 5, 5, 5, 5, 5, 8];
         let count = Cell::new(0);
-        super::binary_search(&5, &s, &|&a, &b|{count.set(count.get() + 1); i32::cmp(&a, &b)});
+        super::binary_search(&5, &s, 0, &|&a, &b|{count.set(count.get() + 1); i32::cmp(&a, &b)});
         assert_eq!(count.get(), 1);
     }
 
