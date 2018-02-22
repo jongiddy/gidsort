@@ -57,9 +57,10 @@ where
     //
     // The gallop starts off slow at the start of the sequence, but increases exponentially to find
     // a range containing the position.  The searched positions are: 1, 3, 7, 15, 31,...
-    let mut p2 = 2;
-    while p2 - 1 < length {
-        let trial = p2 - 1;
+    let mut interval = 1;
+    let mut trial = lo;
+    while interval < length - trial {
+        trial += interval;
         match compare(value, &buffer[trial]) {
             Ordering::Less => {
                 hi = trial;
@@ -67,7 +68,7 @@ where
             },
             Ordering::Greater => {
                 lo = trial + 1;
-                p2 *= 2;
+                interval *= 2;
             },
             Ordering::Equal => {
                 #![cold]
@@ -80,6 +81,44 @@ where
     // lo-hi contains 2^n - 1 elements containing the correct position.  2^n - 1 elements gives us
     // a balanced binary tree.  Perform binary search to find the final insertion position.
     debug_assert!(hi == length || (hi - lo + 1).is_power_of_two());
+    binary_search(value, &buffer[.. hi], lo, compare)
+}
+
+fn gallop_left<T, F>(value: &T, buffer: &[T], compare: &F) -> usize
+where
+    F: Fn(&T, &T) -> Ordering
+{
+    // like gallop_right, but start from the end of the sequence
+    // XXX - the sequence isn't quite the same, since that would require that `trial` starts
+    // at hi - 1 which would require a check for length == 0, so let's leave it for now.
+    let length = buffer.len();
+    let mut lo = 0;       // lowest candidate
+    let mut hi = length;  // highest candidate
+
+    let mut interval = 1;
+    let mut trial = hi;
+    while interval < trial {
+        trial -= interval;
+        match compare(value, &buffer[trial]) {
+            Ordering::Less => {
+                hi = trial;
+                interval *= 2;
+            },
+            Ordering::Greater => {
+                lo = trial + 1;
+                break;
+            },
+            Ordering::Equal => {
+                #![cold]
+                return trial;
+            }
+        }
+    }
+
+    // At this point, either lo == 0, and we're processing the rump of the sequence, or
+    // lo-hi contains 2^n - 1 elements containing the correct position.  2^n - 1 elements gives us
+    // a balanced binary tree.  Perform binary search to find the final insertion position.
+    debug_assert!(lo == 0 || (hi - lo + 1).is_power_of_two());
     binary_search(value, &buffer[.. hi], lo, compare)
 }
 
@@ -918,7 +957,7 @@ mod tests {
             assert_eq!(super::gallop_right(&v, &s, &|&a, &b|{count.set(count.get() + 1); usize::cmp(&a, &b).then(Ordering::Less)}), v);
             profile.push(count.get());
         }
-        assert_eq!(profile, vec![2, 2, 3, 3, 5, 5, 5, 5, 7, 7, 7, 7, 7, 7, 7, 7, 5, 5   ])
+        assert_eq!(profile, vec![2, 2, 3, 3, 5, 5, 5, 5, 7, 7, 7, 7, 7, 7, 7, 7, 5, 5])
     }
 
     #[test]
@@ -931,6 +970,102 @@ mod tests {
             profile.push(count.get());
         }
         assert_eq!(profile, vec![2, 2, 3, 3, 5, 5, 5, 5, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 6, 6, 6])
+    }
+
+    #[test]
+    fn gallop_left_0() {
+        assert_eq!(super::gallop_left(&Nc(3), &[], &Nc::cmp), 0)
+    }
+
+    #[test]
+    fn gallop_left_1_before() {
+        assert_eq!(super::gallop_left(&Nc(1), &[Nc(2)], &Nc::cmp), 0)
+    }
+    #[test]
+    fn gallop_left_1_after() {
+        assert_eq!(super::gallop_left(&Nc(3), &[Nc(2)], &Nc::cmp), 1)
+    }
+
+    #[test]
+    fn gallop_left_2_before() {
+        assert_eq!(super::gallop_left(&Nc(1), &[Nc(2), Nc(4)], &Nc::cmp), 0)
+    }
+    #[test]
+    fn gallop_left_2_middle() {
+        assert_eq!(super::gallop_left(&Nc(3), &[Nc(2), Nc(4)], &Nc::cmp), 1)
+    }
+    #[test]
+    fn gallop_left_2_after() {
+        assert_eq!(super::gallop_left(&Nc(5), &[Nc(2), Nc(4)], &Nc::cmp), 2)
+    }
+
+    #[test]
+    fn gallop_left_3_before() {
+        assert_eq!(super::gallop_left(&Nc(1), &[Nc(2), Nc(4), Nc(6)], &Nc::cmp), 0)
+    }
+    #[test]
+    fn gallop_left_3_lt() {
+        // Default to Ordering::Less if the value should be inserted before equal values
+        let compare = |a: &Nc, b: &Nc|{Nc::cmp(&a, &b).then(Ordering::Less)};
+        assert_eq!(super::gallop_left(&Nc(4), &[Nc(2), Nc(4), Nc(6)], &compare), 1)
+    }
+    #[test]
+    fn gallop_left_3_le() {
+        // Default to Ordering::Greater if value should be inserted after equal values
+        let compare = |a: &Nc, b: &Nc|{Nc::cmp(&a, &b).then(Ordering::Greater)};
+        assert_eq!(super::gallop_left(&Nc(4), &[Nc(2), Nc(4), Nc(6)], &compare), 2)
+    }
+    #[test]
+    fn gallop_left_3_after() {
+        assert_eq!(super::gallop_left(&Nc(7), &[Nc(2), Nc(4), Nc(6)], &Nc::cmp), 3)
+    }
+
+    #[test]
+    fn gallop_left_2powm1() {
+        let s = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14];
+        let mut profile = Vec::new();
+        for v in 0 .. s.len() + 1 {
+            let count = Cell::new(0);
+            assert_eq!(super::gallop_left(&v, &s, &|&a, &b|{count.set(count.get() + 1); usize::cmp(&a, &b).then(Ordering::Less)}), v);
+            profile.push(count.get());
+        }
+        assert_eq!(profile, vec![7, 7, 6, 6, 6, 6, 6, 6, 6, 5, 5, 5, 5, 3, 3, 1])
+    }
+
+    #[test]
+    fn gallop_left_2pow() {
+        let s = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
+        let mut profile = Vec::new();
+        for v in 0 .. s.len() + 1 {
+            let count = Cell::new(0);
+            assert_eq!(super::gallop_left(&v, &s, &|&a, &b|{count.set(count.get() + 1); usize::cmp(&a, &b).then(Ordering::Less)}), v);
+            profile.push(count.get());
+        }
+        assert_eq!(profile, vec![5, 5, 7, 7, 7, 7, 7, 7, 7, 7, 5, 5, 5, 5, 3, 3, 1])
+    }
+
+    #[test]
+    fn gallop_left_2powp1() {
+        let s = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16];
+        let mut profile = Vec::new();
+        for v in 0 .. s.len() + 1 {
+            let count = Cell::new(0);
+            assert_eq!(super::gallop_left(&v, &s, &|&a, &b|{count.set(count.get() + 1); usize::cmp(&a, &b).then(Ordering::Less)}), v);
+            profile.push(count.get());
+        }
+        assert_eq!(profile, vec![6, 6, 5, 7, 7, 7, 7, 7, 7, 7, 7, 5, 5, 5, 5, 3, 3, 1])
+    }
+
+    #[test]
+    fn gallop_left_20() {
+        let s = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19];
+        let mut profile = Vec::new();
+        for v in 0 .. s.len() + 1 {
+            let count = Cell::new(0);
+            assert_eq!(super::gallop_left(&v, &s, &|&a, &b|{count.set(count.get() + 1); usize::cmp(&a, &b).then(Ordering::Less)}), v);
+            profile.push(count.get());
+        }
+        assert_eq!(profile, vec![7, 7, 6, 7, 7, 6, 7, 7, 7, 7, 7, 7, 7, 7, 5, 5, 5, 5, 3, 3, 1])
     }
 
     #[test]
