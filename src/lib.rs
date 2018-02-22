@@ -1,5 +1,6 @@
 #![feature(stmt_expr_attributes)]
 #![feature(swap_nonoverlapping)]
+#![feature(pointer_methods)]
 
 extern crate gcd;
 
@@ -315,10 +316,77 @@ where
     F: Fn(&T, &T) -> Ordering,
     G: Fn(&T, &T) -> Ordering
 {
-    if recurse == 0 {
+    if split <= stack_array_max!(T) {
+        merge_left(s, split, cmpleftright, cmprightleft);
+    } else if recurse == 0 {
         merge_final(s, split, cmpleftright, cmprightleft);
     } else {
         merge_recurse(s, split, cmpleftright, cmprightleft, recurse - 1);
+    }
+}
+
+// When dropped, copies from `src` into `dest`. Derived from
+// https://github.com/rust-lang/rust/blob/27a046e/src/liballoc/slice.rs#L2021-L2031
+struct InsertionHole<T> {
+    src: *const T,
+    dest: *mut T,
+    len: usize,
+}
+
+impl<T> Drop for InsertionHole<T> {
+    fn drop(&mut self) {
+        unsafe {
+            std::ptr::copy_nonoverlapping(self.src, self.dest, self.len);
+        }
+    }
+}
+
+fn merge_left<T, F, G>(s: &mut [T], split: usize, cmpleftright: &F, cmprightleft: &G)
+where
+    F: Fn(&T, &T) -> Ordering,
+    G: Fn(&T, &T) -> Ordering
+{
+    // Perform a merge by moving the left side of the merge to a stack buffer, and then
+    // merging it and the right towards the left side of the original buffer.
+
+    // 1. |L| > 0
+    debug_assert!(split > 0);
+    // 2. |R| > 0
+    debug_assert!(s.len() - split > 0);
+    // 3. l_max is max value
+    debug_assert!(cmprightleft(&s[s.len() - 1], &s[split - 1]) == Ordering::Less);
+    // 4. r_0 is min value
+    debug_assert!(cmpleftright(&s[0], &s[split]) == Ordering::Greater);
+    unsafe {
+        let mut tmp = stack_array_unsafe!([T; split]);
+        std::ptr::copy_nonoverlapping(s.as_ptr(), tmp.as_mut_ptr() as *mut T, split);
+        let mut left = std::slice::from_raw_parts(tmp.as_ptr() as *const T, split);
+        let mut insert = s.as_mut_ptr();
+        let mut _hole = InsertionHole {src: left.as_ptr(), dest: insert, len: left.len()};
+        let mut right = split;
+        macro_rules! rlen {() => (s.len() - right)}
+        while left.len() > 1 {
+            let xlen = gallop_right(&left[0], &s[right + 1 ..], cmpleftright) + 1;
+            if xlen == rlen!() {
+                break;
+            }
+            let zlen = gallop_right(&s[right + xlen], &left[1 .. left.len() - 1], cmprightleft) + 1;
+            std::ptr::copy(s.as_ptr().add(right), insert, xlen);
+            right += xlen;
+            insert = insert.add(xlen);
+            std::ptr::copy_nonoverlapping(left.as_ptr(), insert, zlen);
+            left = &left[zlen ..];
+            insert = insert.add(zlen);
+            _hole.src = left.as_ptr();
+            _hole.dest = insert;
+            _hole.len = left.len();
+        }
+        debug_assert!(rlen!() > 0);
+        debug_assert!(left.len() > 0);
+        std::ptr::copy(s.as_ptr().add(right), insert, rlen!());
+        insert = insert.add(rlen!());
+        _hole.dest = insert;
+        // When `_hole` is dropped, it will copy the last section on the stack buffer to end of `s`
     }
 }
 
