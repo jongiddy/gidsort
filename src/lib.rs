@@ -416,7 +416,7 @@ where
         let mut left = std::slice::from_raw_parts(tmp.as_ptr() as *const T, split);
         let mut hole = InsertionHole {src: left.as_ptr(), dest: s.as_mut_ptr(), len: left.len()};
         let mut right = &s[split ..];
-        debug!("merge_left S={:?} H={:?} R={:?} / L={:?}", &s[..s.len()-right.len()-hole.len], &s[s.len()-right.len()-hole.len..s.len()-right.len()], right, left);
+        debug!("merge_left S {:?} H {:?} R {:?} / L {:?}", &s[..s.len()-right.len()-hole.len], &s[s.len()-right.len()-hole.len..s.len()-right.len()], right, left);
         while left.len() > 1 {
             let xlen = gallop_right(&left[0], &right[1 ..], cmpleftright) + 1;
             if xlen == right.len() {
@@ -431,7 +431,7 @@ where
             hole.src = left.as_ptr();
             hole.dest = hole.dest.add(zlen);
             hole.len -= zlen;
-            debug!("merge_left S={:?} H={:?} R={:?} / L={:?}", &s[..s.len()-right.len()-hole.len], &s[s.len()-right.len()-hole.len..s.len()-right.len()], right, left);
+            debug!("merge_left S {:?} - H {:?} - R {:?} / L {:?}", &s[..s.len()-right.len()-hole.len], &s[s.len()-right.len()-hole.len..s.len()-right.len()], right, left);
         }
         debug_assert!(right.len() > 0);
         debug_assert!(left.len() > 0);
@@ -465,7 +465,7 @@ where
         let mut right = std::slice::from_raw_parts(tmp.as_ptr() as *const T, rlen);
         let mut hole = InsertionHole {src: right.as_ptr(), dest: s.as_mut_ptr().add(split), len: right.len()};
         let mut left = &s[.. split];
-        debug!("merge_right L={:?} H={:?} S={:?} / R={:?}", left, &s[left.len()..left.len()+hole.len], &s[left.len()+hole.len..], right);
+        debug!("merge_right L {:?} - H {:?} - S {:?} / R {:?}", left, &s[left.len()..left.len()+hole.len], &s[left.len()+hole.len..], right);
         while right.len() > 1 {
             let xlen = left.len() - gallop_left(&right[right.len() - 1], &left[.. left.len() - 1], cmprightleft);
             if xlen == left.len() {
@@ -478,7 +478,7 @@ where
             hole.len -= zlen;
             std::ptr::copy_nonoverlapping(right.as_ptr().add(right.len() - zlen), hole.dest.add(hole.len), zlen);
             right = &right[.. right.len() - zlen];
-            debug!("merge_right L={:?} H={:?} S={:?} / R={:?}", left, &s[left.len()..left.len()+hole.len], &s[left.len()+hole.len..], right);
+            debug!("merge_right L {:?} - H {:?} - S {:?} / R {:?}", left, &s[left.len()..left.len()+hole.len], &s[left.len()+hole.len..], right);
         }
         debug_assert!(left.len() > 0);
         debug_assert!(right.len() > 0);
@@ -512,7 +512,7 @@ where
 
     let mut highwater = 1; // elements of R known to be < l_0
 
-    debug!("merge_recurse S={:?} L={:?} M={:?} R={:?}", &s[..left], &s[left..split], &s[split..split+highwater], &s[split+highwater..]);
+    debug!("merge_recurse S {:?} - L {:?} - M {:?} - R {:?}", &s[..left], &s[left..split], &s[split..split+highwater], &s[split+highwater..]);
     while llen!() > 1 && rlen!() > highwater {
         let xlen = gallop_right(&s[left], &s[split + highwater .. right], cmpleftright) + highwater;
         if xlen == rlen!() {
@@ -547,7 +547,7 @@ where
             left += zlen;
             highwater = xlen + 1;
         }
-        debug!("merge_recurse S={:?} L={:?} M={:?} R={:?}", &s[..left], &s[left..split], &s[split..split+highwater], &s[split+highwater..]);
+        debug!("merge_recurse S {:?} - L {:?} - M {:?} - R {:?}", &s[..left], &s[left..split], &s[split..split+highwater], &s[split+highwater..]);
     }
     // since r_0..r_highwater are < l_0, we just need to swap L and R
     // since l_max is largest value, if |L| = 1, we just need to swap L and R
@@ -578,7 +578,7 @@ where
 
     let mut highwater = 1; // elements of R known to be < l_0
 
-    debug!("merge_final S={:?} L={:?} M={:?} R={:?}", &s[..left], &s[left..split], &s[split..split+highwater], &s[split+highwater..]);
+    debug!("merge_final S {:?} - L {:?} - M {:?} - R {:?}", &s[..left], &s[left..split], &s[split..split+highwater], &s[split+highwater..]);
     while llen!() > 1 && rlen!() > highwater {
         let xlen = gallop_right(&s[left], &s[split + highwater .. right], cmpleftright) + highwater;
         if xlen == rlen!() {
@@ -606,7 +606,7 @@ where
             left += zlen;
             highwater = xlen + 1;
         }
-        debug!("merge_final S={:?} L={:?} M={:?} R={:?}", &s[..left], &s[left..split], &s[split..split+highwater], &s[split+highwater..]);
+        debug!("merge_final S {:?} - L {:?} - M {:?} - R {:?}", &s[..left], &s[left..split], &s[split..split+highwater], &s[split+highwater..]);
     }
     // since r_0..r_highwater are < l_0, we just need to swap L and R
     // since l_max is largest value, if |L| = 1, we just need to swap L and R
@@ -931,15 +931,66 @@ mod tests {
     }
 
     #[test]
-    fn merge_alternative() {
+    fn merge_left_alternative() {
         let mut s = [
-            Nc(0), Nc(2), Nc(4), Nc(6), Nc(8), Nc(10), Nc(12), Nc(14),
-            Nc(1), Nc(3), Nc(5), Nc(7), Nc(9), Nc(11), Nc(13), Nc(15)
+            2, 4, 6, 8, 10, 12, 14, 16,
+            1, 3, 5, 7, 9, 11, 13, 15,
         ];
+        let count = Cell::new(0);
         let leftlen = s.len() / 2;
-        super::merge(&mut s, leftlen, &Nc::cmp, &Nc::cmp, super::MAX_RECURSION_LIMIT);
+        let compare = |a: &usize, b: &usize|{count.set(count.get() + 1); usize::cmp(&a, &b)};
+        super::merge_left(&mut s, leftlen, &compare, &compare);
+        assert_eq!(count.get(), 26);
         for (i, elem) in s.iter().enumerate() {
-            assert_eq!(*elem, Nc(i as i32));
+            assert_eq!(*elem, i + 1);
+        }
+    }
+
+    #[test]
+    fn merge_right_alternative() {
+        let mut s = [
+            2, 4, 6, 8, 10, 12, 14, 16,
+            1, 3, 5, 7, 9, 11, 13, 15,
+        ];
+        let count = Cell::new(0);
+        let leftlen = s.len() / 2;
+        let compare = |a: &usize, b: &usize|{count.set(count.get() + 1); usize::cmp(&a, &b)};
+        super::merge_right(&mut s, leftlen, &compare, &compare);
+        assert_eq!(count.get(), 15);
+        for (i, elem) in s.iter().enumerate() {
+            assert_eq!(*elem, i + 1);
+        }
+    }
+
+    #[test]
+    fn merge_recurse_alternative() {
+        let mut s = [
+            2, 4, 6, 8, 10, 12, 14, 16,
+            1, 3, 5, 7, 9, 11, 13, 15,
+        ];
+        let count = Cell::new(0);
+        let leftlen = s.len() / 2;
+        let compare = |a: &usize, b: &usize|{count.set(count.get() + 1); usize::cmp(&a, &b)};
+        super::merge_recurse(&mut s, leftlen, &compare, &compare, super::MAX_RECURSION_LIMIT);
+        assert_eq!(count.get(), 26);
+        for (i, elem) in s.iter().enumerate() {
+            assert_eq!(*elem, i + 1);
+        }
+    }
+
+    #[test]
+    fn merge_final_alternative() {
+        let mut s = [
+            2, 4, 6, 8, 10, 12, 14, 16,
+            1, 3, 5, 7, 9, 11, 13, 15,
+        ];
+        let count = Cell::new(0);
+        let leftlen = s.len() / 2;
+        let compare = |a: &usize, b: &usize|{count.set(count.get() + 1); usize::cmp(&a, &b)};
+        super::merge_final(&mut s, leftlen, &compare, &compare);
+        assert_eq!(count.get(), 26);
+        for (i, elem) in s.iter().enumerate() {
+            assert_eq!(*elem, i + 1);
         }
     }
 
