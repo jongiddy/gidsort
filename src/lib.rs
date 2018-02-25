@@ -92,15 +92,18 @@ fn gallop_left<T, F>(value: &T, buffer: &[T], compare: &F) -> usize
 where
     F: Fn(&T, &T) -> Ordering
 {
-    // like gallop_right, but start from the end of the sequence
-    // XXX - the sequence isn't quite the same, since that would require that `trial` starts
-    // at hi - 1 which would require a check for length == 0, so let's leave it for now.
+    // like gallop_right, but start from the end of the sequence.  There is a slight difference
+    // in that when length == 2^n then `interval < trial` does not examine the far end before
+    // dropping to binary search.  This doesn't appear to make much difference in practice.
     let length = buffer.len();
     let mut lo = 0;       // lowest candidate
     let mut hi = length;  // highest candidate
 
+    if length == 0 {
+        return 0;
+    }
     let mut interval = 1;
-    let mut trial = hi;
+    let mut trial = hi - 1;
     while interval < trial {
         trial -= interval;
         match compare(value, &buffer[trial]) {
@@ -956,7 +959,7 @@ mod tests {
         let leftlen = s.len() / 2;
         let compare = |a: &usize, b: &usize|{count.set(count.get() + 1); usize::cmp(&a, &b)};
         super::merge_right(&mut s, leftlen, &compare, &compare);
-        assert_eq!(count.get(), 15);
+        assert_eq!(count.get(), 24);
         for (i, elem) in s.iter().enumerate() {
             assert_eq!(*elem, i + 1);
         }
@@ -1147,7 +1150,7 @@ mod tests {
             assert_eq!(super::gallop_left(&v, &s, &|&a, &b|{count.set(count.get() + 1); usize::cmp(&a, &b).then(Ordering::Less)}), v);
             profile.push(count.get());
         }
-        assert_eq!(profile, vec![7, 7, 6, 6, 6, 6, 6, 6, 6, 5, 5, 5, 5, 3, 3, 1])
+        assert_eq!(profile, vec![6, 6, 6, 6, 6, 6, 6, 6, 5, 5, 5, 5, 3, 3, 2, 2])
     }
 
     #[test]
@@ -1159,7 +1162,7 @@ mod tests {
             assert_eq!(super::gallop_left(&v, &s, &|&a, &b|{count.set(count.get() + 1); usize::cmp(&a, &b).then(Ordering::Less)}), v);
             profile.push(count.get());
         }
-        assert_eq!(profile, vec![5, 5, 7, 7, 7, 7, 7, 7, 7, 7, 5, 5, 5, 5, 3, 3, 1])
+        assert_eq!(profile, vec![7, 7, 6, 6, 6, 6, 6, 6, 6, 5, 5, 5, 5, 3, 3, 2, 2])
     }
 
     #[test]
@@ -1171,7 +1174,7 @@ mod tests {
             assert_eq!(super::gallop_left(&v, &s, &|&a, &b|{count.set(count.get() + 1); usize::cmp(&a, &b).then(Ordering::Less)}), v);
             profile.push(count.get());
         }
-        assert_eq!(profile, vec![6, 6, 5, 7, 7, 7, 7, 7, 7, 7, 7, 5, 5, 5, 5, 3, 3, 1])
+        assert_eq!(profile, vec![5, 5, 7, 7, 7, 7, 7, 7, 7, 7, 5, 5, 5, 5, 3, 3, 2, 2])
     }
 
     #[test]
@@ -1183,7 +1186,7 @@ mod tests {
             assert_eq!(super::gallop_left(&v, &s, &|&a, &b|{count.set(count.get() + 1); usize::cmp(&a, &b).then(Ordering::Less)}), v);
             profile.push(count.get());
         }
-        assert_eq!(profile, vec![7, 7, 6, 7, 7, 6, 7, 7, 7, 7, 7, 7, 7, 7, 5, 5, 5, 5, 3, 3, 1])
+        assert_eq!(profile, vec![7, 7, 6, 6, 6, 7, 7, 7, 7, 7, 7, 7, 7, 5, 5, 5, 5, 3, 3, 2, 2])
     }
 
     #[test]
