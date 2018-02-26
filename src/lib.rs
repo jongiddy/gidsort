@@ -369,9 +369,9 @@ where
     macro_rules! llen {() => (split)}
     macro_rules! rlen {() => (s.len() - split)}
 
-    if llen!() <= stack_array_max!(T) {
+    if stack_array_max!(T) > 1 && llen!() <= stack_array_max!(T) {
         merge_left(s, split, cmpleftright, cmprightleft);
-    } else if rlen!() <= stack_array_max!(T) {
+    } else if stack_array_max!(T) > 1 && rlen!() <= stack_array_max!(T) {
         merge_right(s, split, cmpleftright, cmprightleft);
     } else if recurse == 0 {
         merge_final(s, split, cmpleftright, cmprightleft);
