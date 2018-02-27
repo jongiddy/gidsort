@@ -692,12 +692,6 @@ where
     F: Fn(&T, &T) -> Ordering,
     G: Fn(&T, &T) -> Ordering
 {
-    // Move backwards through the slice, sorting blocks of 4. When we have two sorted blocks,
-    // merge them into a block of 8.  When we have two sorted blocks of 8, merge them into a
-    // block of 16.  To do this, look at the start of each 4-block.  If it has a 0 in the 4's digit
-    // (0100), then it is an even block of 4 - add it to the following odd block of 4. Then check
-    // the 8's digit (1000). If it is an even block of 8, add it to the following odd block of 8.
-    // We check for the end of the slice, to avoid merging an even block into a non-existent block.
     // We do this to be cache-friendly rather than sorting by 4's, then 8's, etc. reading the
     // entire slice each time.
     let end = s.len();
@@ -715,6 +709,56 @@ where
         start -= 4;
         sort4(&mut s[start .. end], cmpleftright);
         let mut size = 4usize;
+        // We iterate backwards through the slice in blocks of size = 4:
+        //
+        //           A                         B                         C
+        //    |             |           |             |           |---size *2---|
+        //    |      |-size-|           |-size-|      |           |      |      |
+        //  xxy0xx xxy1xx xxx0xx      xxy0xx xxy1xx xxx0xx      xxy0xx xxy1xx xxx0xx
+        //         start   end        start   end                start   mid    end
+        //
+        // When start & 4 == 1 (A), then we just sort the right block of 4.
+        // When start & 4 == 0 (B), then the right block of 4 was sorted on the previous iteration,
+        // and we sort the left block of 4.  Now that we have two sorted blocks, we merge the block
+        // of 8 (C).  We then check if start & 8 == 0 (y).  If it is, then we have two sorted
+        // blocks of 8 that can be merged into a block of 16.  We continue to do this until we
+        // reach a size where (start & (power of two) == 1), indicating that we are sorting the
+        // right-hand block of a pair.  This method of merging provides good cache locality, and
+        // is cache-oblivious.
+        //
+        // while start & size == 0 {
+        //     let mid = end;
+        //     end = mid + size;
+        //     merge(&mut s[start .. end], size, cmpleftright, cmprightleft, recurse);
+        //     size *= 2;
+        // }
+        //
+        // Of course, we need to deal with trailing blocks that are not power of two, and also with
+        // `start == 0`, where there is no bit set to 1 to terminate the merges.  To merge the
+        // final non-power-of-two block, we ensure that `end` cannot be set past the end of the
+        // slice.  We also check that `mid < s.len()`.  If `mid >= s.len()`, then the next merge
+        // will have nothing on the righthand side, so we are done.  When `start == 0` and the
+        // righthand side has no elements, then the already sorted lefthand side is the complete
+        // sorted slice.
+        //
+        // while start & size == 0 {
+        //     let mid = end;
+        //     if mid >= s.len() {break;}
+        //     end = mid + size;
+        //     if end > s.len() {end = s.len();}
+        //     merge(&mut s[start .. end], size, cmpleftright, cmprightleft, recurse);
+        //     size *= 2;
+        // }
+        //
+        // Since `mid` is just `end` from the previous iteration, we can move the check into the
+        // `while` conditional.
+        //
+        // while start & size == 0 && end < s.len() {
+        //     end = min(end + size, s.len());
+        //     merge(&mut s[start .. end], size, cmpleftright, cmprightleft, recurse);
+        //     size *= 2;
+        // }
+        //
         while start & size == 0 && end < s.len() {
             end = min(end + size, s.len());
             merge(&mut s[start .. end], size, cmpleftright, cmprightleft, recurse);
