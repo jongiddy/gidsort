@@ -114,31 +114,31 @@ macro_rules! sort_bench {
     }
 }
 
-sort_bench!(small_random_27a046e93_s, gen_random, 10);
-sort_bench!(small_ascending_27a046e93_s, gen_ascending, 10);
-sort_bench!(small_descending_27a046e93_s, gen_descending, 10);
+sort_bench!(small_random_29f5c699b_s, gen_random, 10);
+sort_bench!(small_ascending_29f5c699b_s, gen_ascending, 10);
+sort_bench!(small_descending_29f5c699b_s, gen_descending, 10);
 
-sort_bench!(small_big_random_27a046e93_s, gen_big_random, 10);
-sort_bench!(small_big_ascending_27a046e93_s, gen_big_ascending, 10);
-sort_bench!(small_big_descending_27a046e93_s, gen_big_descending, 10);
+sort_bench!(small_big_random_29f5c699b_s, gen_big_random, 10);
+sort_bench!(small_big_ascending_29f5c699b_s, gen_big_ascending, 10);
+sort_bench!(small_big_descending_29f5c699b_s, gen_big_descending, 10);
 
-sort_bench!(medium_random_27a046e93_s, gen_random, 100);
-sort_bench!(medium_ascending_27a046e93_s, gen_ascending, 100);
-sort_bench!(medium_descending_27a046e93_s, gen_descending, 100);
+sort_bench!(medium_random_29f5c699b_s, gen_random, 100);
+sort_bench!(medium_ascending_29f5c699b_s, gen_ascending, 100);
+sort_bench!(medium_descending_29f5c699b_s, gen_descending, 100);
 
-sort_bench!(large_short_runs_27a046e93_s, gen_short_runs, 10000);
-sort_bench!(large_random_27a046e93_s, gen_random, 10000);
-sort_bench!(large_ascending_27a046e93_s, gen_ascending, 10000);
-sort_bench!(large_descending_27a046e93_s, gen_descending, 10000);
-sort_bench!(large_mostly_ascending_27a046e93_s, gen_mostly_ascending, 10000);
-sort_bench!(large_mostly_descending_27a046e93_s, gen_mostly_descending, 10000);
+sort_bench!(large_short_runs_29f5c699b_s, gen_short_runs, 10000);
+sort_bench!(large_random_29f5c699b_s, gen_random, 10000);
+sort_bench!(large_ascending_29f5c699b_s, gen_ascending, 10000);
+sort_bench!(large_descending_29f5c699b_s, gen_descending, 10000);
+sort_bench!(large_mostly_ascending_29f5c699b_s, gen_mostly_ascending, 10000);
+sort_bench!(large_mostly_descending_29f5c699b_s, gen_mostly_descending, 10000);
 
-sort_bench!(nightmare_27a046e93_s, gen_nightmare, 1);
-sort_bench!(marenight_27a046e93_s, gen_marenight, 1);
+sort_bench!(nightmare_29f5c699b_s, gen_nightmare, 1);
+sort_bench!(marenight_29f5c699b_s, gen_marenight, 1);
 
-sort_bench!(large_big_random_27a046e93_s, gen_big_random, 10000);
-sort_bench!(large_big_ascending_27a046e93_s, gen_big_ascending, 10000);
-sort_bench!(large_big_descending_27a046e93_s, gen_big_descending, 10000);
+sort_bench!(large_big_random_29f5c699b_s, gen_big_random, 10000);
+sort_bench!(large_big_ascending_29f5c699b_s, gen_big_ascending, 10000);
+sort_bench!(large_big_descending_29f5c699b_s, gen_big_descending, 10000);
 
 macro_rules! unstable_sort_bench {
     ($name:ident, $gen:expr, $len:expr) => {
@@ -150,31 +150,31 @@ macro_rules! unstable_sort_bench {
     }
 }
 
-unstable_sort_bench!(small_random_27a046e93_u, gen_random, 10);
-unstable_sort_bench!(small_ascending_27a046e93_u, gen_ascending, 10);
-unstable_sort_bench!(small_descending_27a046e93_u, gen_descending, 10);
+unstable_sort_bench!(small_random_29f5c699b_u, gen_random, 10);
+unstable_sort_bench!(small_ascending_29f5c699b_u, gen_ascending, 10);
+unstable_sort_bench!(small_descending_29f5c699b_u, gen_descending, 10);
 
-unstable_sort_bench!(small_big_random_27a046e93_u, gen_big_random, 10);
-unstable_sort_bench!(small_big_ascending_27a046e93_u, gen_big_ascending, 10);
-unstable_sort_bench!(small_big_descending_27a046e93_u, gen_big_descending, 10);
+unstable_sort_bench!(small_big_random_29f5c699b_u, gen_big_random, 10);
+unstable_sort_bench!(small_big_ascending_29f5c699b_u, gen_big_ascending, 10);
+unstable_sort_bench!(small_big_descending_29f5c699b_u, gen_big_descending, 10);
 
-unstable_sort_bench!(medium_random_27a046e93_u, gen_random, 100);
-unstable_sort_bench!(medium_ascending_27a046e93_u, gen_ascending, 100);
-unstable_sort_bench!(medium_descending_27a046e93_u, gen_descending, 100);
+unstable_sort_bench!(medium_random_29f5c699b_u, gen_random, 100);
+unstable_sort_bench!(medium_ascending_29f5c699b_u, gen_ascending, 100);
+unstable_sort_bench!(medium_descending_29f5c699b_u, gen_descending, 100);
 
-unstable_sort_bench!(large_short_runs_27a046e93_u, gen_short_runs, 10000);
-unstable_sort_bench!(large_random_27a046e93_u, gen_random, 10000);
-unstable_sort_bench!(large_ascending_27a046e93_u, gen_ascending, 10000);
-unstable_sort_bench!(large_descending_27a046e93_u, gen_descending, 10000);
-unstable_sort_bench!(large_mostly_ascending_27a046e93_u, gen_mostly_ascending, 10000);
-unstable_sort_bench!(large_mostly_descending_27a046e93_u, gen_mostly_descending, 10000);
+unstable_sort_bench!(large_short_runs_29f5c699b_u, gen_short_runs, 10000);
+unstable_sort_bench!(large_random_29f5c699b_u, gen_random, 10000);
+unstable_sort_bench!(large_ascending_29f5c699b_u, gen_ascending, 10000);
+unstable_sort_bench!(large_descending_29f5c699b_u, gen_descending, 10000);
+unstable_sort_bench!(large_mostly_ascending_29f5c699b_u, gen_mostly_ascending, 10000);
+unstable_sort_bench!(large_mostly_descending_29f5c699b_u, gen_mostly_descending, 10000);
 
-unstable_sort_bench!(nightmare_27a046e93_u, gen_nightmare, 1);
-unstable_sort_bench!(marenight_27a046e93_u, gen_marenight, 1);
+unstable_sort_bench!(nightmare_29f5c699b_u, gen_nightmare, 1);
+unstable_sort_bench!(marenight_29f5c699b_u, gen_marenight, 1);
 
-unstable_sort_bench!(large_big_random_27a046e93_u, gen_big_random, 10000);
-unstable_sort_bench!(large_big_ascending_27a046e93_u, gen_big_ascending, 10000);
-unstable_sort_bench!(large_big_descending_27a046e93_u, gen_big_descending, 10000);
+unstable_sort_bench!(large_big_random_29f5c699b_u, gen_big_random, 10000);
+unstable_sort_bench!(large_big_ascending_29f5c699b_u, gen_big_ascending, 10000);
+unstable_sort_bench!(large_big_descending_29f5c699b_u, gen_big_descending, 10000);
 
 macro_rules! new_sort_bench {
     ($name:ident, $gen:expr, $len:expr) => {
