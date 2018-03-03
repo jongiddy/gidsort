@@ -99,7 +99,7 @@ where
     let mut lo = 0;       // lowest candidate
     let mut hi = length;  // highest candidate
 
-    if length == 0 {
+    if buffer.is_empty() {
         return 0;
     }
     let mut interval = 1;
@@ -226,13 +226,13 @@ fn rotate_gcd<T>(s: &mut [T], k: usize) {
     }
 }
 
-macro_rules! stack_array_max {
+macro_rules! stack_slice_max {
     ( $type:ty ) => {
         STACK_OBJECT_SIZE / std::mem::size_of::<T>()
     };
 }
 
-macro_rules! stack_array_unsafe {
+macro_rules! stack_slice_unsafe {
     ( [ $type:ty ; $len:expr ] ) => {{
         // size_of cannot be used to size an array: https://github.com/rust-lang/rust/issues/43408
         // let mut tmp: [T; STACK_OBJECT_SIZE / std::mem::size_of::<T>()] = std::mem::uninitialized();
@@ -249,7 +249,7 @@ macro_rules! stack_array_unsafe {
 fn rotate_left_shift<T>(s: &mut [T], llen: usize) {
     let rlen = s.len() - llen;
     unsafe {
-        let mut tmp = stack_array_unsafe!([T; llen]);
+        let mut tmp = stack_slice_unsafe!([T; llen]);
         let t = tmp.as_mut_ptr() as *mut T;
         let src = s.as_ptr();
         let dst = s.as_mut_ptr();
@@ -262,7 +262,7 @@ fn rotate_left_shift<T>(s: &mut [T], llen: usize) {
 fn rotate_right_shift<T>(s: &mut [T], rlen: usize) {
     let llen = s.len() - rlen;
     unsafe {
-        let mut tmp = stack_array_unsafe!([T; rlen]);
+        let mut tmp = stack_slice_unsafe!([T; rlen]);
         let t = tmp.as_mut_ptr() as *mut T;
         let src = s.as_ptr();
         let dst = s.as_mut_ptr();
@@ -283,13 +283,13 @@ fn rotate<T>(s: &mut [T], rlen: usize) {
     }
     match llen.cmp(&rlen) {
         Ordering::Less => {
-            if llen <= stack_array_max!(T) {
+            if llen <= stack_slice_max!(T) {
                 rotate_left_shift(s, llen);
                 return
             }
         },
         Ordering::Greater => {
-            if rlen <= stack_array_max!(T) {
+            if rlen <= stack_slice_max!(T) {
                 rotate_right_shift(s, rlen);
                 return
             }
@@ -303,7 +303,7 @@ fn rotate<T>(s: &mut [T], rlen: usize) {
 }
 
 
-fn trim<T, F, G>(s: &[T], split: usize, cmpleftright: &F, cmprightleft: &G) -> Option<(usize, usize)>
+fn trim<T, F, G>(l: &[T], r: &[T], cmpleftright: &F, cmprightleft: &G) -> Option<(usize, usize)>
 where
     F: Fn(&T, &T) -> Ordering,
     G: Fn(&T, &T) -> Ordering
@@ -314,48 +314,42 @@ where
     // that sequences that are in order use one comparison.   Much real data is close to already
     // sorted, so optimising this case is valuable.
     //
-    // Then, a binary search of the l[max] value over R is done, as any values in R that are higher
-    // than l[max] are already in their final position, and can be ignored.  In a typical mergesort,
-    // the two sequences will each have length 2^n, and the first step means we search one less, or
-    // `2^n - 1`.  This is the optimal size for binary search, as it means the search must take
-    // `log2 n` comparisons.
+    // Then, a gallop left of the l[max] value over R is done, as any values in R that are higher
+    // than l[max] are already in their final position, and can be ignored.
     //
     // Finally, we check for values in L that are less than r[0], as they are also in their final
     // position.  In this case, we gallop right, since we expect r[0] to be lower than the median
     // value in L.
-    let slen = s.len();
-    let llen = split;
-    let rlen = slen - split;
 
-    if llen == 0 || rlen == 0 {
+    if l.is_empty() || r.is_empty() {
         return None;
     }
 
     // Check if sequences are already in order
-    if cmpleftright(&s[split - 1], &s[split]) != Ordering::Greater {
+    if cmpleftright(l.last().unwrap(), r.first().unwrap()) != Ordering::Greater {
         // l[max] <= r[0] -> L-R is already sorted
         return None;
     }
-    // Trim off in-position high values of R to leave l[max] as largest value
-    // From above, r[0] <= l[max], so exclude r[0] from search.
-    let right = binary_search(&s[split - 1], &s[split ..], 1, cmpleftright) + split;
+    // Find insertion point of l[max] in R and trim off higher values, which are in final position,
+    // leaving l[max] as highest value.  From above, l[max] > r[0], so exclude r[0] from search.
+    let right = gallop_left(l.last().unwrap(), &r[1..], cmpleftright) + 1;
 
-    // Trim off in-position low values of L to leave r[0] as smallest value
-    // From above, l[max] >= r[0], so exclude l[max] from search.
-    let left = gallop_right(&s[split], &s[.. split - 1], cmprightleft);
+    // Find insertion point of r[0] in L and trim off lower values, which are in final position,
+    // leaving r[0] as lowest value.  From above, l[max] > r[0], so exclude r[0] from search.
+    let left = gallop_right(r.first().unwrap(), &l[.. l.len() - 1], cmprightleft);
 
     Some((left, right))
 }
 
-fn merge<T, F, G>(s: &mut [T], split: usize, cmpleftright: &F, cmprightleft: &G, recurse: u32)
+fn merge_inplace<T, F, G>(s: &mut [T], split: usize, cmpleftright: &F, cmprightleft: &G, recurse: u32)
 where
     T: std::fmt::Debug,
     F: Fn(&T, &T) -> Ordering,
     G: Fn(&T, &T) -> Ordering
 {
-    if let Some((left, right)) = trim(s, split, cmpleftright, cmprightleft) {
+    if let Some((left, right)) = trim(&s[..split], &s[split..], cmpleftright, cmprightleft) {
         debug!("\nS={:?}", s);
-        merge_trimmed(&mut s[left .. right], split - left, cmpleftright, cmprightleft, recurse);
+        merge_trimmed(&mut s[left .. split + right], split - left, cmpleftright, cmprightleft, recurse);
         debug!("S={:?}\n", s);
     }
 }
@@ -369,9 +363,9 @@ where
     macro_rules! llen {() => (split)}
     macro_rules! rlen {() => (s.len() - split)}
 
-    if stack_array_max!(T) > 1 && llen!() <= stack_array_max!(T) {
+    if stack_slice_max!(T) > 1 && llen!() <= stack_slice_max!(T) {
         merge_left(s, split, cmpleftright, cmprightleft);
-    } else if stack_array_max!(T) > 1 && rlen!() <= stack_array_max!(T) {
+    } else if stack_slice_max!(T) > 1 && rlen!() <= stack_slice_max!(T) {
         merge_right(s, split, cmpleftright, cmprightleft);
     } else if recurse == 0 {
         merge_final(s, split, cmpleftright, cmprightleft);
@@ -382,13 +376,13 @@ where
 
 // When dropped, copies from `src` into `dest`. Derived from
 // https://github.com/rust-lang/rust/blob/27a046e/src/liballoc/slice.rs#L2021-L2031
-struct InsertionHole<T> {
+struct CopyOnDrop<T> {
     src: *const T,
     dest: *mut T,
     len: usize,
 }
 
-impl<T> Drop for InsertionHole<T> {
+impl<T> Drop for CopyOnDrop<T> {
     fn drop(&mut self) {
         unsafe {
             std::ptr::copy_nonoverlapping(self.src, self.dest, self.len);
@@ -402,7 +396,7 @@ where
     F: Fn(&T, &T) -> Ordering,
     G: Fn(&T, &T) -> Ordering
 {
-    // Perform a merge by moving the left side of the merge to a stack buffer, and then
+    // Perform a merge by moving the left side of the merge to a stack slice, and then
     // merging it and the right towards the left side of the original buffer.
 
     // 1. |L| > 0
@@ -410,37 +404,37 @@ where
     // 2. |R| > 0
     debug_assert!(s.len() - split > 0);
     // 3. l_max is max value
-    debug_assert!(cmprightleft(&s[s.len() - 1], &s[split - 1]) == Ordering::Less);
+    debug_assert!(cmprightleft(s.last().unwrap(), &s[split - 1]) == Ordering::Less);
     // 4. r_0 is min value
-    debug_assert!(cmpleftright(&s[0], &s[split]) == Ordering::Greater);
+    debug_assert!(cmpleftright(s.first().unwrap(), &s[split]) == Ordering::Greater);
     unsafe {
-        let mut tmp = stack_array_unsafe!([T; split]);
+        let mut tmp = stack_slice_unsafe!([T; split]);
         std::ptr::copy_nonoverlapping(s.as_ptr(), tmp.as_mut_ptr() as *mut T, split);
-        let mut left = std::slice::from_raw_parts(tmp.as_ptr() as *const T, split);
-        let mut hole = InsertionHole {src: left.as_ptr(), dest: s.as_mut_ptr(), len: left.len()};
-        let mut right = &s[split ..];
-        debug!("merge_left S {:?} H {:?} R {:?} / L {:?}", &s[..s.len()-right.len()-hole.len], &s[s.len()-right.len()-hole.len..s.len()-right.len()], right, left);
-        while left.len() > 1 {
-            let xlen = gallop_right(&left[0], &right[1 ..], cmpleftright) + 1;
-            if xlen == right.len() {
+        let mut l = std::slice::from_raw_parts(tmp.as_ptr() as *const T, split);
+        let mut hole = CopyOnDrop {src: l.as_ptr(), dest: s.as_mut_ptr(), len: l.len()};
+        let mut r = &s[split ..];
+        debug!("merge_left S {:?} H {:?} R {:?} / L {:?}", &s[..s.len()-r.len()-hole.len], &s[s.len()-r.len()-hole.len..s.len()-r.len()], r, l);
+        while l.len() > 1 {
+            let xlen = gallop_right(&l[0], &r[1 ..], cmpleftright) + 1;
+            if xlen == r.len() {
                 break;
             }
-            let zlen = gallop_right(&right[xlen], &left[1 .. left.len() - 1], cmprightleft) + 1;
-            std::ptr::copy(right.as_ptr(), hole.dest, xlen);
-            right = &right[xlen ..];
+            let zlen = gallop_right(&r[xlen], &l[1 .. l.len() - 1], cmprightleft) + 1;
+            std::ptr::copy(r.as_ptr(), hole.dest, xlen);
+            r = &r[xlen ..];
             hole.dest = hole.dest.add(xlen);
-            std::ptr::copy_nonoverlapping(left.as_ptr(), hole.dest, zlen);
-            left = &left[zlen ..];
-            hole.src = left.as_ptr();
+            std::ptr::copy_nonoverlapping(l.as_ptr(), hole.dest, zlen);
+            l = &l[zlen ..];
+            hole.src = l.as_ptr();
             hole.dest = hole.dest.add(zlen);
             hole.len -= zlen;
-            debug!("merge_left S {:?} - H {:?} - R {:?} / L {:?}", &s[..s.len()-right.len()-hole.len], &s[s.len()-right.len()-hole.len..s.len()-right.len()], right, left);
+            debug!("merge_left S {:?} - H {:?} - R {:?} / L {:?}", &s[..s.len()-r.len()-hole.len], &s[s.len()-r.len()-hole.len..s.len()-r.len()], r, l);
         }
-        debug_assert!(right.len() > 0);
-        debug_assert!(left.len() > 0);
-        std::ptr::copy(right.as_ptr(), hole.dest, right.len());
-        hole.dest = hole.dest.add(right.len());
-        // When `hole` is dropped, it will copy the last section on the stack buffer to end of `s`
+        debug_assert!(r.len() > 0);
+        debug_assert!(l.len() > 0);
+        std::ptr::copy(r.as_ptr(), hole.dest, r.len());
+        hole.dest = hole.dest.add(r.len());
+        // When `hole` is dropped, it will copy the last section on the stack slice to end of `s`
     }
 }
 
@@ -450,7 +444,7 @@ where
     F: Fn(&T, &T) -> Ordering,
     G: Fn(&T, &T) -> Ordering
 {
-    // Perform a merge by moving the right side of the merge to a stack buffer, and then
+    // Perform a merge by moving the right side of the merge to a stack slice, and then
     // merging it and the left towards the right side of the original buffer.
 
     // 1. |L| > 0
@@ -458,36 +452,36 @@ where
     // 2. |R| > 0
     debug_assert!(s.len() - split > 0);
     // 3. l_max is max value
-    debug_assert!(cmprightleft(&s[s.len() - 1], &s[split - 1]) == Ordering::Less);
+    debug_assert!(cmprightleft(s.last().unwrap(), &s[split - 1]) == Ordering::Less);
     // 4. r_0 is min value
-    debug_assert!(cmpleftright(&s[0], &s[split]) == Ordering::Greater);
+    debug_assert!(cmpleftright(s.first().unwrap(), &s[split]) == Ordering::Greater);
     unsafe {
         let rlen = s.len() - split;
-        let mut tmp = stack_array_unsafe!([T; rlen]);
+        let mut tmp = stack_slice_unsafe!([T; rlen]);
         std::ptr::copy_nonoverlapping(s.as_ptr().add(split), tmp.as_mut_ptr() as *mut T, rlen);
-        let mut right = std::slice::from_raw_parts(tmp.as_ptr() as *const T, rlen);
-        let mut hole = InsertionHole {src: right.as_ptr(), dest: s.as_mut_ptr().add(split), len: right.len()};
-        let mut left = &s[.. split];
-        debug!("merge_right L {:?} - H {:?} - S {:?} / R {:?}", left, &s[left.len()..left.len()+hole.len], &s[left.len()+hole.len..], right);
-        while right.len() > 1 {
-            let xlen = left.len() - gallop_left(&right[right.len() - 1], &left[.. left.len() - 1], cmprightleft);
-            if xlen == left.len() {
+        let mut r = std::slice::from_raw_parts(tmp.as_ptr() as *const T, rlen);
+        let mut hole = CopyOnDrop {src: r.as_ptr(), dest: s.as_mut_ptr().add(split), len: r.len()};
+        let mut l = &s[.. split];
+        debug!("merge_right L {:?} - H {:?} - S {:?} / R {:?}", l, &s[l.len()..l.len()+hole.len], &s[l.len()+hole.len..], r);
+        while r.len() > 1 {
+            let xlen = l.len() - gallop_left(r.last().unwrap(), &l[.. l.len() - 1], cmprightleft);
+            if xlen == l.len() {
                 break;
             }
-            let zlen = right.len() - (gallop_left(&left[left.len() - xlen - 1], &right[1 .. right.len() - 1], cmpleftright) + 1);
+            let zlen = r.len() - (gallop_left(&l[l.len() - xlen - 1], &r[1 .. r.len() - 1], cmpleftright) + 1);
             hole.dest = hole.dest.sub(xlen);
-            std::ptr::copy(left.as_ptr().add(left.len() - xlen), hole.dest.add(hole.len), xlen);
-            left = &left[.. left.len() - xlen];
+            std::ptr::copy(l.as_ptr().add(l.len() - xlen), hole.dest.add(hole.len), xlen);
+            l = &l[.. l.len() - xlen];
             hole.len -= zlen;
-            std::ptr::copy_nonoverlapping(right.as_ptr().add(right.len() - zlen), hole.dest.add(hole.len), zlen);
-            right = &right[.. right.len() - zlen];
-            debug!("merge_right L {:?} - H {:?} - S {:?} / R {:?}", left, &s[left.len()..left.len()+hole.len], &s[left.len()+hole.len..], right);
+            std::ptr::copy_nonoverlapping(r.as_ptr().add(r.len() - zlen), hole.dest.add(hole.len), zlen);
+            r = &r[.. r.len() - zlen];
+            debug!("merge_right L {:?} - H {:?} - S {:?} / R {:?}", l, &s[l.len()..l.len()+hole.len], &s[l.len()+hole.len..], r);
         }
-        debug_assert!(left.len() > 0);
-        debug_assert!(right.len() > 0);
-        hole.dest = hole.dest.sub(left.len());
-        std::ptr::copy(left.as_ptr(), hole.dest.add(hole.len), left.len());
-        // When `hole` is dropped, it will copy the last section on the stack buffer to end of `s`
+        debug_assert!(l.len() > 0);
+        debug_assert!(r.len() > 0);
+        hole.dest = hole.dest.sub(l.len());
+        std::ptr::copy(l.as_ptr(), hole.dest.add(hole.len), l.len());
+        // When `hole` is dropped, it will copy the last section on the stack slice to end of `s`
     }
 }
 
@@ -623,8 +617,8 @@ fn rotate_right_1<T>(s: &mut [T]) {
         let src = s.as_ptr();
         let dst = s.as_mut_ptr();
         let mut tmp: T = std::mem::uninitialized();
-        std::ptr::copy_nonoverlapping(src.offset(r as isize), &mut tmp, 1);
-        std::ptr::copy(src, dst.offset(1), r);
+        std::ptr::copy_nonoverlapping(src.add(r), &mut tmp, 1);
+        std::ptr::copy(src, dst.add(1), r);
         std::ptr::copy_nonoverlapping(&tmp, dst, 1);
         std::mem::forget(tmp);
     }
@@ -692,8 +686,6 @@ where
     F: Fn(&T, &T) -> Ordering,
     G: Fn(&T, &T) -> Ordering
 {
-    // We do this to be cache-friendly rather than sorting by 4's, then 8's, etc. reading the
-    // entire slice each time.
     let end = s.len();
     let rump = end % 4;
     let mut start = end - rump;
@@ -704,64 +696,64 @@ where
         _ => unreachable!(),
     }
 
+    // We iterate backwards through the slice in blocks of size = 4:
+    //
+    //           A                         B                         C
+    //    |             |           |             |           |---size *2---|
+    //    |      |-size-|           |-size-|      |           |      |      |
+    //  xxy0xx xxy1xx xxx0xx      xxy0xx xxy1xx xxx0xx      xxy0xx xxy1xx xxx0xx
+    //         start   end        start   end                start   mid    end
+    //
+    // When start & 4 == 1 (A), then we just sort the right block of 4.
+    // When start & 4 == 0 (B), then the right block of 4 was sorted on the previous iteration,
+    // and we sort the left block of 4.  Now that we have two sorted blocks, we merge the block
+    // of 8 (C).  We then check if start & 8 == 0 (y).  If it is, then we have two sorted
+    // blocks of 8 that can be merged into a block of 16.  We continue to do this until we
+    // reach a size where (start & (power of two) == 1), indicating that we are sorting the
+    // right-hand block of a pair.  This method of merging provides good cache locality, and
+    // is cache-oblivious.
+    //
+    // while start & size == 0 {
+    //     let mid = end;
+    //     end = mid + size;
+    //     merge_inplace(&mut s[start .. end], size, cmpleftright, cmprightleft, recurse);
+    //     size *= 2;
+    // }
+    //
+    // Of course, we need to deal with trailing blocks that are not power of two, and also with
+    // `start == 0`, where there is no bit set to 1 to terminate the merges.  To merge the
+    // final non-power-of-two block, we ensure that `end` cannot be set past the end of the
+    // slice.  We also check that `mid < s.len()`.  If `mid >= s.len()`, then the next merge
+    // will have nothing on the righthand side, so we are done.  When `start == 0` and the
+    // righthand side has no elements, then the already sorted lefthand side is the complete
+    // sorted slice.
+    //
+    // while start & size == 0 {
+    //     let mid = end;
+    //     if mid >= s.len() {break;}
+    //     end = mid + size;
+    //     if end > s.len() {end = s.len();}
+    //     merge_inplace(&mut s[start .. end], size, cmpleftright, cmprightleft, recurse);
+    //     size *= 2;
+    // }
+    //
+    // Since `mid` is just `end` from the previous iteration, we can move the check into the
+    // `while` conditional.
+    //
+    // while start & size == 0 && end < s.len() {
+    //     end = min(end + size, s.len());
+    //     merge_inplace(&mut s[start .. end], size, cmpleftright, cmprightleft, recurse);
+    //     size *= 2;
+    // }
+    //
     while start > 0 {
         let mut end = start;
         start -= 4;
         sort4(&mut s[start .. end], cmpleftright);
         let mut size = 4usize;
-        // We iterate backwards through the slice in blocks of size = 4:
-        //
-        //           A                         B                         C
-        //    |             |           |             |           |---size *2---|
-        //    |      |-size-|           |-size-|      |           |      |      |
-        //  xxy0xx xxy1xx xxx0xx      xxy0xx xxy1xx xxx0xx      xxy0xx xxy1xx xxx0xx
-        //         start   end        start   end                start   mid    end
-        //
-        // When start & 4 == 1 (A), then we just sort the right block of 4.
-        // When start & 4 == 0 (B), then the right block of 4 was sorted on the previous iteration,
-        // and we sort the left block of 4.  Now that we have two sorted blocks, we merge the block
-        // of 8 (C).  We then check if start & 8 == 0 (y).  If it is, then we have two sorted
-        // blocks of 8 that can be merged into a block of 16.  We continue to do this until we
-        // reach a size where (start & (power of two) == 1), indicating that we are sorting the
-        // right-hand block of a pair.  This method of merging provides good cache locality, and
-        // is cache-oblivious.
-        //
-        // while start & size == 0 {
-        //     let mid = end;
-        //     end = mid + size;
-        //     merge(&mut s[start .. end], size, cmpleftright, cmprightleft, recurse);
-        //     size *= 2;
-        // }
-        //
-        // Of course, we need to deal with trailing blocks that are not power of two, and also with
-        // `start == 0`, where there is no bit set to 1 to terminate the merges.  To merge the
-        // final non-power-of-two block, we ensure that `end` cannot be set past the end of the
-        // slice.  We also check that `mid < s.len()`.  If `mid >= s.len()`, then the next merge
-        // will have nothing on the righthand side, so we are done.  When `start == 0` and the
-        // righthand side has no elements, then the already sorted lefthand side is the complete
-        // sorted slice.
-        //
-        // while start & size == 0 {
-        //     let mid = end;
-        //     if mid >= s.len() {break;}
-        //     end = mid + size;
-        //     if end > s.len() {end = s.len();}
-        //     merge(&mut s[start .. end], size, cmpleftright, cmprightleft, recurse);
-        //     size *= 2;
-        // }
-        //
-        // Since `mid` is just `end` from the previous iteration, we can move the check into the
-        // `while` conditional.
-        //
-        // while start & size == 0 && end < s.len() {
-        //     end = min(end + size, s.len());
-        //     merge(&mut s[start .. end], size, cmpleftright, cmprightleft, recurse);
-        //     size *= 2;
-        // }
-        //
         while start & size == 0 && end < s.len() {
             end = min(end + size, s.len());
-            merge(&mut s[start .. end], size, cmpleftright, cmprightleft, recurse);
+            merge_inplace(&mut s[start .. end], size, cmpleftright, cmprightleft, recurse);
             size *= 2;
         }
     }
@@ -892,7 +884,7 @@ mod tests {
         let mut s: [i32; 0] = [];
         let count = Cell::new(0);
         let compare = |a: &i32, b: &i32|{count.set(count.get() + 1); i32::cmp(&a, &b)};
-        super::merge(&mut s, 0, &compare, &compare, super::MAX_RECURSION_LIMIT);
+        super::merge_inplace(&mut s, 0, &compare, &compare, super::MAX_RECURSION_LIMIT);
         assert_eq!(count.get(), 0);
     }
 
@@ -901,7 +893,7 @@ mod tests {
         let mut s = [1];
         let count = Cell::new(0);
         let compare = |a: &i32, b: &i32|{count.set(count.get() + 1); i32::cmp(&a, &b)};
-        super::merge(&mut s, 0, &compare, &compare, super::MAX_RECURSION_LIMIT);
+        super::merge_inplace(&mut s, 0, &compare, &compare, super::MAX_RECURSION_LIMIT);
         assert_eq!(count.get(), 0);
         assert_eq!(s[0], 1);
     }
@@ -911,7 +903,7 @@ mod tests {
         let mut s = [1];
         let count = Cell::new(0);
         let compare = |a: &i32, b: &i32|{count.set(count.get() + 1); i32::cmp(&a, &b)};
-        super::merge(&mut s, 1, &compare, &compare, super::MAX_RECURSION_LIMIT);
+        super::merge_inplace(&mut s, 1, &compare, &compare, super::MAX_RECURSION_LIMIT);
         assert_eq!(count.get(), 0);
         assert_eq!(s[0], 1);
     }
@@ -921,7 +913,7 @@ mod tests {
         let mut s = [1, 2];
         let count = Cell::new(0);
         let compare = |a: &i32, b: &i32|{count.set(count.get() + 1); i32::cmp(&a, &b)};
-        super::merge(&mut s, 1, &compare, &compare, super::MAX_RECURSION_LIMIT);
+        super::merge_inplace(&mut s, 1, &compare, &compare, super::MAX_RECURSION_LIMIT);
         assert_eq!(count.get(), 1);
         assert_eq!(s[0], 1);
         assert_eq!(s[1], 2);
@@ -932,7 +924,7 @@ mod tests {
         let mut s = [2, 1];
         let count = Cell::new(0);
         let compare = |a: &i32, b: &i32|{count.set(count.get() + 1); i32::cmp(&a, &b)};
-        super::merge(&mut s, 1, &compare, &compare, super::MAX_RECURSION_LIMIT);
+        super::merge_inplace(&mut s, 1, &compare, &compare, super::MAX_RECURSION_LIMIT);
         // One compare required, but there are 2 debug_assert that compare
         assert!(count.get() <= 3);
         assert_eq!(s[0], 1);
@@ -944,7 +936,7 @@ mod tests {
         let mut s = [7, 0, 1, 2, 3, 4, 5, 6, 8, 9, 10];
         let count = Cell::new(0);
         let compare = |a: &usize, b: &usize|{count.set(count.get() + 1); usize::cmp(&a, &b)};
-        super::merge(&mut s, 1, &compare, &compare, super::MAX_RECURSION_LIMIT);
+        super::merge_inplace(&mut s, 1, &compare, &compare, super::MAX_RECURSION_LIMIT);
         // assert_eq!(count.get(), 4);
         for (i, elem) in s.iter().enumerate() {
             assert_eq!(*elem, i);
@@ -957,7 +949,7 @@ mod tests {
         let count = Cell::new(0);
         let leftlen = s.len() - 1;
         let compare = |a: &usize, b: &usize|{count.set(count.get() + 1); usize::cmp(&a, &b)};
-        super::merge(&mut s, leftlen, &compare, &compare, super::MAX_RECURSION_LIMIT);
+        super::merge_inplace(&mut s, leftlen, &compare, &compare, super::MAX_RECURSION_LIMIT);
         // assert_eq!(count.get(), 5);
         for (i, elem) in s.iter().enumerate() {
             assert_eq!(*elem, i);
@@ -970,7 +962,7 @@ mod tests {
         let count = Cell::new(0);
         let leftlen = s.len() / 2;
         let compare = |a: &usize, b: &usize|{count.set(count.get() + 1); usize::cmp(&a, &b)};
-        super::merge(&mut s, leftlen, &compare, &compare, super::MAX_RECURSION_LIMIT);
+        super::merge_inplace(&mut s, leftlen, &compare, &compare, super::MAX_RECURSION_LIMIT);
         assert_eq!(count.get(), 1);
         for (i, elem) in s.iter().enumerate() {
             assert_eq!(*elem, i);
