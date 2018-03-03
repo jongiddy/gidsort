@@ -1392,4 +1392,140 @@ mod tests {
             s.windows(2).all(|v| v[0].1 < v[1].1 || (v[0].1 == v[1].1 && v[0].0 < v[1].0))
         }
     }
+
+    // Check that the benchmarks sort correctly
+    extern crate rand;
+    use self::rand::{thread_rng, Rng};
+
+    fn gen_ascending(len: usize) -> Vec<u64> {
+        (0..len as u64).collect()
+    }
+
+    fn gen_descending(len: usize) -> Vec<u64> {
+        (0..len as u64).rev().collect()
+    }
+
+    fn gen_random(len: usize) -> Vec<u64> {
+        let mut rng = thread_rng();
+        rng.gen_iter::<u64>().take(len).collect()
+    }
+
+    fn gen_mostly_ascending(len: usize) -> Vec<u64> {
+        let mut rng = thread_rng();
+        let mut v = gen_ascending(len);
+        for _ in (0usize..).take_while(|x| x * x <= len) {
+            let x = rng.gen::<usize>() % len;
+            let y = rng.gen::<usize>() % len;
+            v.swap(x, y);
+        }
+        v
+    }
+
+    fn gen_mostly_descending(len: usize) -> Vec<u64> {
+        let mut rng = thread_rng();
+        let mut v = gen_descending(len);
+        for _ in (0usize..).take_while(|x| x * x <= len) {
+            let x = rng.gen::<usize>() % len;
+            let y = rng.gen::<usize>() % len;
+            v.swap(x, y);
+        }
+        v
+    }
+
+    fn gen_short_runs(len: usize) -> Vec<u64> {
+        // swap odds and evens to create many short runs
+        // 7 2 1 4 3 6 5 0
+        let mut v = gen_ascending(len);
+        let last = v.len() - 1;
+        v.swap(0, last);
+        for i in 1 .. last {
+            if i % 2 == 0 {
+                v.swap(i - 1, i);
+            }
+        }
+        v
+    }
+
+    fn gen_nightmare(_: usize) -> Vec<u64> {
+        let mut left = Vec::<u64>::new();
+        let mut right = Vec::<u64>::new();
+        let mut val = 0;
+        for i in 2 .. 513 {
+            right.push(val);
+            val += 1;
+            for _ in 0 .. i {
+                left.push(val);
+                val += 1;
+            }
+        }
+        left.append(&mut right);
+        left
+    }
+
+    fn gen_marenight(_: usize) -> Vec<u64> {
+        let mut left = Vec::<u64>::new();
+        let mut right = Vec::<u64>::new();
+        let mut val = 0;
+        for i in 2 .. 513 {
+            right.push(val);
+            val += 1;
+            for _ in 0 .. i {
+                left.push(val);
+                val += 1;
+            }
+        }
+        right.append(&mut left);
+        right
+    }
+
+    fn gen_big_random(len: usize) -> Vec<[u64; 16]> {
+        let mut rng = thread_rng();
+        rng.gen_iter().map(|x| [x; 16]).take(len).collect()
+    }
+
+    fn gen_big_ascending(len: usize) -> Vec<[u64; 16]> {
+        (0..len as u64).map(|x| [x; 16]).take(len).collect()
+    }
+
+    fn gen_big_descending(len: usize) -> Vec<[u64; 16]> {
+        (0..len as u64).rev().map(|x| [x; 16]).take(len).collect()
+    }
+
+    macro_rules! bench_test {
+        ($name:ident, $gen:expr, $len:expr) => {
+            #[test]
+            fn $name() {
+                let mut s = $gen($len);
+                super::sort(&mut s);
+                assert!(s.windows(2).all(|v| v[0] <= v[1]));
+            }
+        }
+    }
+
+    bench_test!(small_random_bench_test, gen_random, 10);
+    bench_test!(small_ascending_bench_test, gen_ascending, 10);
+    bench_test!(small_descending_bench_test, gen_descending, 10);
+
+    bench_test!(small_big_random_bench_test, gen_big_random, 10);
+    bench_test!(small_big_ascending_bench_test, gen_big_ascending, 10);
+    bench_test!(small_big_descending_bench_test, gen_big_descending, 10);
+
+    bench_test!(medium_random_bench_test, gen_random, 100);
+    bench_test!(medium_ascending_bench_test, gen_ascending, 100);
+    bench_test!(medium_descending_bench_test, gen_descending, 100);
+
+    bench_test!(large_short_runs_bench_test, gen_short_runs, 10000);
+    bench_test!(large_random_bench_test, gen_random, 10000);
+    bench_test!(large_ascending_bench_test, gen_ascending, 10000);
+    bench_test!(large_descending_bench_test, gen_descending, 10000);
+    bench_test!(large_mostly_ascending_bench_test, gen_mostly_ascending, 10000);
+    bench_test!(large_mostly_descending_bench_test, gen_mostly_descending, 10000);
+
+    bench_test!(nightmare_bench_test, gen_nightmare, 1);
+    bench_test!(marenight_bench_test, gen_marenight, 1);
+
+    bench_test!(large_big_random_bench_test, gen_big_random, 10000);
+    bench_test!(large_big_ascending_bench_test, gen_big_ascending, 10000);
+    bench_test!(large_big_descending_bench_test, gen_big_descending, 10000);
+
 }
