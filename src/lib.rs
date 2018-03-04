@@ -158,6 +158,7 @@ where
 
 fn swap_ends<T>(s: &mut [T], k: usize) {
     // Swap front k items of sequence with back k items
+    debug_assert!(k > 0);
     debug_assert!(k <= s.len() / 2);
     let b = s.len() - k;
     if k * std::mem::size_of::<T>() < 128 {
@@ -275,12 +276,9 @@ fn rotate_right_shift<T>(s: &mut [T], rlen: usize) {
 fn rotate<T>(s: &mut [T], rlen: usize) {
     // Rotate the last rlen elements to the front of the slice.
     // given a slice of 0..n, move n-rlen..n to front and 0..n-rlen to end
-    let length = s.len();
-    debug_assert!(rlen <= length);
-    let llen = length - rlen;
-    if llen == 0 || rlen == 0 {
-        return
-    }
+    debug_assert!(rlen > 0);
+    let llen = s.len() - rlen;
+    debug_assert!(llen > 0);
     match llen.cmp(&rlen) {
         Ordering::Less => {
             if llen <= stack_slice_max!(T) {
@@ -540,7 +538,9 @@ where
             highwater = mr - split;
         } else {
             swap_ends(&mut s[left + zlen - xlen .. split + xlen], xlen);
-            rotate(&mut s[left .. left + zlen], xlen);
+            if zlen != xlen {
+                rotate(&mut s[left .. left + zlen], xlen);
+            }
             left += zlen;
             highwater = xlen + 1;
         }
@@ -599,7 +599,9 @@ where
             highwater = xlen + 1;
         } else {
             swap_ends(&mut s[left + zlen - xlen .. split + xlen], xlen);
-            rotate(&mut s[left .. left + zlen], xlen);
+            if zlen != xlen {
+                rotate(&mut s[left .. left + zlen], xlen);
+            }
             left += zlen;
             highwater = xlen + 1;
         }
@@ -1318,6 +1320,7 @@ mod tests {
     }
 
     #[test]
+    #[should_panic]
     fn swap_ends_zero() {
         let mut buf = [1, 2, 3, 4, 5, 6];
         super::swap_ends(&mut buf, 0);
@@ -1325,6 +1328,7 @@ mod tests {
     }
 
     #[test]
+    #[should_panic]
     fn rotate0_0() {
         let mut buf: [i32; 0] = [];
         super::rotate(&mut buf, 0);
@@ -1332,6 +1336,7 @@ mod tests {
     }
 
     #[test]
+    #[should_panic]
     fn rotate0_1() {
         let mut buf = [4];
         super::rotate(&mut buf, 0);
@@ -1339,6 +1344,7 @@ mod tests {
     }
 
     #[test]
+    #[should_panic]
     fn rotate1_0() {
         let mut buf = [4];
         super::rotate(&mut buf, 1);
