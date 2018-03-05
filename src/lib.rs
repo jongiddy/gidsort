@@ -626,30 +626,122 @@ fn rotate_right_1<T>(s: &mut [T]) {
     }
 }
 
-fn sort4<T, F>(s: &mut [T], compare: &F)
+macro_rules! ascending {
+    ( $comparison:expr ) => ( $comparison != Ordering::Greater )
+}
+
+fn sort4<T, F>(s: &mut [T], compare: &F) -> bool
 where
+    T: std::fmt::Debug,
     F: Fn(&T, &T) -> Ordering
 {
     // Handcrafted sort for chunks of 4
-    debug_assert!(s.len() == 4);
-    if compare(&s[0], &s[1]) == Ordering::Greater {
-        s.swap(0, 1);
-    }
-    if compare(&s[1], &s[2]) == Ordering::Greater {
-        if compare(&s[0], &s[2]) == Ordering::Greater {
-            rotate_right_1(&mut s[0 .. 3]);
+    //
+    // We'd like to optimise ascending and descending sequences to 3 comparisons, and minimise
+    // comparisons for other patterns.
+    //
+    // To do this, we need to change path depending on whether the block appears to be ascending
+    // or descending.  We check elements 0 and 1, then choose a path, compare elements 1 and 2,
+    // and refine the path. If we have a purely ascending or descending sequence after two
+    // comparisons, then we do the third comparison to check that it continues.  Otherwise, we
+    // resort to sorting  based on what we've learnt.  This sort uses 5 comparisons max, which is
+    // pretty good. The theoretical minimum is log2(24) = 4.585, so with the opportunities to use
+    // 3 or 4 comparisons, this must be close.
+    //
+    // However, the bias towards ascending and descending sequences gives it a small penalty for
+    // random sequences over the previous algorithm, which was insertion sort hard-wired for
+    // a block of 4.
+    //
+    // This function also returns a boolean which indicates if the block is mostly descending.
+    // This can be used for further optimisation at a higher level.
+    assert!(s.len() == 4);
+    if ascending!(compare(&s[0], &s[1])) {
+        // a
+        if ascending!(compare(&s[1], &s[2])) {
+            // aa
+            if ! ascending!(compare(&s[2], &s[3])) {
+                // aad
+                if ascending!(compare(&s[0], &s[3])) {
+                    if ascending!(compare(&s[1], &s[3])) {
+                        s.swap(2, 3);
+                    } else {
+                        rotate_right_1(&mut s[1..]);
+                    }
+                } else {
+                    rotate_right_1(s);
+                }
+            }
+            debug!("sort4 {:?}", s);
+            false
         } else {
+            // ad
             s.swap(1, 2);
+            if ! ascending!(compare(&s[0], &s[1])) {
+                s.swap(0, 1);
+            }
+            // -> aa
+            if ascending!(compare(&s[1], &s[3])) {
+                if ! ascending!(compare(&s[2], &s[3])) {
+                    s.swap(2, 3);
+                }
+                debug!("sort4 {:?}", s);
+                false
+            } else {
+                if ascending!(compare(&s[0], &s[3])) {
+                    rotate_right_1(&mut s[1..]);
+                } else {
+                    rotate_right_1(s);
+                }
+                debug!("sort4 {:?}", s);
+                true
+            }
         }
-    }
-    if compare(&s[1], &s[3]) == Ordering::Greater {
-        if compare(&s[0], &s[3]) == Ordering::Greater {
-            rotate_right_1(s);
+    } else {
+        // d
+        if ! ascending!(compare(&s[1], &s[2])) {
+            // dd
+            if ascending!(compare(&s[2], &s[3])) {
+                // dda
+                s.swap(0, 2);
+                // -> aa?
+                if ! ascending!(compare(&s[2], &s[3])) {
+                    // aad
+                    s.swap(2, 3);
+                    if ! ascending!(compare(&s[1], &s[2])) {
+                        s.swap(1, 2);
+                    }
+                }
+            } else {
+                // ddd
+                s.swap(0, 3);
+                s.swap(1, 2);
+            }
+            debug!("sort4 {:?}", s);
+            true
         } else {
-            rotate_right_1(&mut s[1 ..]);
+            // da
+            s.swap(0, 1);
+            // -> a?
+            if ! ascending!(compare(&s[1], &s[2])) {
+                s.swap(1, 2);
+            }
+            // -> aa
+            if ascending!(compare(&s[1], &s[3])) {
+                if ! ascending!(compare(&s[2], &s[3])) {
+                    s.swap(2, 3);
+                }
+                debug!("sort4 {:?}", s);
+                false
+            } else {
+                if ascending!(compare(&s[0], &s[3])) {
+                    rotate_right_1(&mut s[1..]);
+                } else {
+                    rotate_right_1(s);
+                }
+                debug!("sort4 {:?}", s);
+                true
+            }
         }
-    } else if compare(&s[2], &s[3]) == Ordering::Greater {
-        s.swap(2, 3);
     }
 }
 
@@ -658,15 +750,15 @@ where
     F: Fn(&T, &T) -> Ordering
 {
     // Handcrafted sort for chunks of 3
-    debug_assert!(s.len() == 3);
-    if compare(&s[0], &s[1]) == Ordering::Greater {
+    assert!(s.len() == 3);
+    if ! ascending!(compare(&s[0], &s[1])) {
         s.swap(0, 1);
     }
-    if compare(&s[1], &s[2]) == Ordering::Greater {
-        if compare(&s[0], &s[2]) == Ordering::Greater {
-            rotate_right_1(&mut s[0 .. 3]);
-        } else {
+    if ! ascending!(compare(&s[1], &s[2])) {
+        if ascending!(compare(&s[0], &s[2])) {
             s.swap(1, 2);
+        } else {
+            rotate_right_1(&mut s[.. 3]);
         }
     }
 }
@@ -676,8 +768,8 @@ where
     F: Fn(&T, &T) -> Ordering
 {
     // Handcrafted sort for chunks of 2
-    debug_assert!(s.len() == 2);
-    if compare(&s[0], &s[1]) == Ordering::Greater {
+    assert!(s.len() == 2);
+    if ! ascending!(compare(&s[0], &s[1])) {
         s.swap(0, 1);
     }
 }
@@ -851,7 +943,7 @@ mod tests {
         // Using the merge algorithm only gives the minimum number of comparisons (15).  However,
         // the handcrafted sort of 4 uses one additional comparison for each block of 4.  This
         // benefits random data more, and sort of ordered data is still faster than anything else.
-        assert_eq!(count.get(), 19); // minimum is 15
+        assert_eq!(count.get(), 15); // minimum is 15
     }
 
     #[test]
