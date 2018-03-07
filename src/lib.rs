@@ -645,8 +645,8 @@ where
     // and refine the path. If we have a purely ascending or descending sequence after two
     // comparisons, then we do the third comparison to check that it continues.  Otherwise, we
     // resort to sorting  based on what we've learnt.  This sort uses 5 comparisons max, which is
-    // pretty good. The theoretical minimum is log2(24) = 4.585, so with the opportunities to use
-    // 3 or 4 comparisons, this must be close.
+    // pretty good. The theoretical minimum is log2(24) = 4.585. With 2 patterns requiring 3
+    // comparisons and 2 requiring 4 comparisons, this algorithm averages 4.75 comparisons.
     //
     // However, the bias towards ascending and descending sequences gives it a small penalty for
     // random sequences over the previous algorithm, which was insertion sort hard-wired for
@@ -656,37 +656,49 @@ where
     // This can be used for further optimisation at a higher level.
     assert!(s.len() == 4);
     if ascending!(compare(&s[0], &s[1])) {
-        // a
         if ascending!(compare(&s[1], &s[2])) {
-            // aa
+            // 1234 1243 1342 2341
             if ! ascending!(compare(&s[2], &s[3])) {
-                // aad
+                // 1243 1342 2341
                 if ascending!(compare(&s[0], &s[3])) {
+                    // 1243 1342
                     if ascending!(compare(&s[1], &s[3])) {
+                        // 1243
                         s.swap(2, 3);
                     } else {
+                        // 1342
                         rotate_right_1(&mut s[1..]);
                     }
                 } else {
+                    // 2341
                     rotate_right_1(s);
                 }
             }
+            // 1234 = 3
+            // 2341 = 4
+            // 1243 1342 = 5
             debug!("sort4 {:?}", s);
             false
         } else {
-            // ad
+            // 1324 1423 1432 2314 2413 2431 3412 3421
             s.swap(1, 2);
+            // 1234(1324) 1243(1423) 1342(1432) 2134(2314)
+            // 2143(2413) 2341(2431) 3142(3412) 3241(3421)
             if ! ascending!(compare(&s[0], &s[1])) {
+                //
                 s.swap(0, 1);
             }
-            // -> aa
+            // 1234(1324) 1243(1423) 1342(1432) 1234(2314)
+            // 1243(2413) 2341(2431) 1342(3412) 2341(3421)
             if ascending!(compare(&s[1], &s[3])) {
+                // 1234(1324) 1243(1423) 1234(2314) 1243(2413)
                 if ! ascending!(compare(&s[2], &s[3])) {
                     s.swap(2, 3);
                 }
                 debug!("sort4 {:?}", s);
                 false
             } else {
+                // 1342(1432) 2341(2431) 1342(3412) 2341(3421)
                 if ascending!(compare(&s[0], &s[3])) {
                     rotate_right_1(&mut s[1..]);
                 } else {
@@ -695,52 +707,66 @@ where
                 debug!("sort4 {:?}", s);
                 true
             }
+            // 1324 1423 1432 2314 2413 2431 3412 3421 = 5
         }
     } else {
-        // d
         if ! ascending!(compare(&s[1], &s[2])) {
-            // dd
+            // 3214 4213 4312 4321
             if ascending!(compare(&s[2], &s[3])) {
-                // dda
+                // 3214 4213 4312
                 s.swap(0, 2);
-                // -> aa?
+                // 1234(3214) 1243(4213) 1342(4312)
                 if ! ascending!(compare(&s[2], &s[3])) {
-                    // aad
+                    // 1243(4213) 1342(4312)
                     s.swap(2, 3);
+                    // 1234(4213) 1324(4312)
                     if ! ascending!(compare(&s[1], &s[2])) {
+                        // 1324(4312)
                         s.swap(1, 2);
                     }
                 }
             } else {
-                // ddd
+                // 4321
                 s.swap(0, 3);
                 s.swap(1, 2);
             }
             debug!("sort4 {:?}", s);
             true
+            // 4321 = 3
+            // 3214 = 4
+            // 4213 4312 = 5
         } else {
-            // da
+            // 2134 2143 3124 3142
+            // 3241 4123 4132 4231
             s.swap(0, 1);
-            // -> a?
+            // 1234(2134) 1243(2143) 1324(3124) 1342(3142)
+            // 2341(3241) 1423(4123) 1432(4132) 2431(4231)
             if ! ascending!(compare(&s[1], &s[2])) {
                 s.swap(1, 2);
             }
-            // -> aa
+            // 1234(2134) 1243(2143) 1234(3124) 1342(3142)
+            // 2341(3241) 1243(4123) 1342(4132) 2341(4231)
             if ascending!(compare(&s[1], &s[3])) {
+                // 1234(2134) 1243(2143) 1234(3124) 1243(4123)
                 if ! ascending!(compare(&s[2], &s[3])) {
+                    // 1243(2143) 1243(4123)
                     s.swap(2, 3);
                 }
                 debug!("sort4 {:?}", s);
                 false
             } else {
+                // 1342(3142) 2341(3241) 1342(4132) 2341(4231)
                 if ascending!(compare(&s[0], &s[3])) {
+                    // 1342(3142) 1342(4132)
                     rotate_right_1(&mut s[1..]);
                 } else {
+                    // 2341(3241) 2341(4231)
                     rotate_right_1(s);
                 }
                 debug!("sort4 {:?}", s);
                 true
             }
+            // 2134 2143 3124 3142 3241 4123 4132 4231 = 5
         }
     }
 }
