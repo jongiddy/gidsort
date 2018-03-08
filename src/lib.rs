@@ -139,7 +139,7 @@ where
     while hi > lo {
         let trial = lo + (hi - lo) / 2;
         debug_assert!(trial < length);
-        match compare(value, &buffer[trial]) {
+        match unsafe{ compare(value, &buffer.get_unchecked(trial)) } {
             Ordering::Less => {
                 hi = trial;
             },
