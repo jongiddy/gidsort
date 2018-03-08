@@ -618,11 +618,9 @@ fn rotate_right_1<T>(s: &mut [T]) {
     unsafe {
         let src = s.as_ptr();
         let dst = s.as_mut_ptr();
-        let mut tmp: T = std::mem::uninitialized();
-        std::ptr::copy_nonoverlapping(src.add(r), &mut tmp, 1);
+        let tmp = std::ptr::read(src.add(r));
         std::ptr::copy(src, dst.add(1), r);
-        std::ptr::copy_nonoverlapping(&tmp, dst, 1);
-        std::mem::forget(tmp);
+        std::ptr::write(dst, tmp);
     }
 }
 
@@ -655,6 +653,7 @@ where
     // This function also returns a boolean which indicates if the block is mostly descending.
     // This can be used for further optimisation at a higher level.
     assert!(s.len() == 4);
+    debug!("sort4 in {:?}", s);
     if ascending!(compare(&s[0], &s[1])) {
         if ascending!(compare(&s[1], &s[2])) {
             // 1234 1243 1342 2341
@@ -680,30 +679,31 @@ where
             debug!("sort4 {:?}", s);
             false
         } else {
-            // 1324 1423 1432 2314 2413 2431 3412 3421
-            s.swap(1, 2);
-            // 1234(1324) 1243(1423) 1342(1432) 2134(2314)
-            // 2143(2413) 2341(2431) 3142(3412) 3241(3421)
-            if ! ascending!(compare(&s[0], &s[1])) {
+            // 1324 1423 1432 2314
+            // 2413 2431 3412 3421
+            if ! ascending!(compare(&s[0], &s[2])) {
                 //
-                s.swap(0, 1);
+                s.swap(0, 2);
             }
-            // 1234(1324) 1243(1423) 1342(1432) 1234(2314)
-            // 1243(2413) 2341(2431) 1342(3412) 2341(3421)
-            if ascending!(compare(&s[1], &s[3])) {
-                // 1234(1324) 1243(1423) 1234(2314) 1243(2413)
-                if ! ascending!(compare(&s[2], &s[3])) {
-                    s.swap(2, 3);
+            // 1324(1324) 1423(1423) 1432(1432) 1324(2314)
+            // 1423(2413) 2431(2431) 1432(3412) 2431(3421)
+            if ascending!(compare(&s[2], &s[3])) {
+                // 1324(1324) 1423(1423) 1324(2314) 1423(2413)
+                if ! ascending!(compare(&s[1], &s[3])) {
+                    s.swap(1, 3);
                 }
+                // 1324(1324) 1324(1423) 1324(2314) 1324(2413)
+                s.swap(1, 2);
                 debug!("sort4 {:?}", s);
                 false
             } else {
-                // 1342(1432) 2341(2431) 1342(3412) 2341(3421)
-                if ascending!(compare(&s[0], &s[3])) {
-                    rotate_right_1(&mut s[1..]);
-                } else {
-                    rotate_right_1(s);
+                // 1432(1432) 2431(2431) 1432(3412) 2431(3421)
+                if ! ascending!(compare(&s[0], &s[3])) {
+                    // 2431(2431) 2431(3421)
+                    s.swap(0, 3);
                 }
+                // 1432(1432) 1432(2431) 1432(3412) 1432(3421)
+                s.swap(1, 3);
                 debug!("sort4 {:?}", s);
                 true
             }
@@ -738,33 +738,31 @@ where
         } else {
             // 2134 2143 3124 3142
             // 3241 4123 4132 4231
-            s.swap(0, 1);
-            // 1234(2134) 1243(2143) 1324(3124) 1342(3142)
-            // 2341(3241) 1423(4123) 1432(4132) 2431(4231)
-            if ! ascending!(compare(&s[1], &s[2])) {
-                s.swap(1, 2);
+            if ! ascending!(compare(&s[0], &s[2])) {
+                s.swap(0, 2);
             }
-            // 1234(2134) 1243(2143) 1234(3124) 1342(3142)
-            // 2341(3241) 1243(4123) 1342(4132) 2341(4231)
-            if ascending!(compare(&s[1], &s[3])) {
-                // 1234(2134) 1243(2143) 1234(3124) 1243(4123)
+            // 2134(2134) 2143(2143) 2134(3124) 3142(3142)
+            // 3241(3241) 2143(4123) 3142(4132) 3241(4231)
+            if ascending!(compare(&s[0], &s[3])) {
+                // 2134(2134) 2143(2143) 2134(3124) 2143(4123)
                 if ! ascending!(compare(&s[2], &s[3])) {
-                    // 1243(2143) 1243(4123)
+                    // 2143(2143) 2143(4123)
                     s.swap(2, 3);
                 }
+                s.swap(0, 1);
                 debug!("sort4 {:?}", s);
                 false
             } else {
-                // 1342(3142) 2341(3241) 1342(4132) 2341(4231)
-                if ascending!(compare(&s[0], &s[3])) {
-                    // 1342(3142) 1342(4132)
-                    rotate_right_1(&mut s[1..]);
-                } else {
-                    // 2341(3241) 2341(4231)
-                    rotate_right_1(s);
+                // 3142(3142) 3241(3241) 3142(4132) 3241(4231)
+                if ascending!(compare(&s[1], &s[3])) {
+                    s.swap(1, 3);
                 }
+                // 3241(3142) 3241(3241) 3241(4132) 3241(4231)
+                s.swap(2, 3);
+                // 3214(3142) 3214(3241) 3214(4132) 3214(4231)
+                s.swap(0, 2);
                 debug!("sort4 {:?}", s);
-                true
+                false
             }
             // 2134 2143 3124 3142 3241 4123 4132 4231 = 5
         }
