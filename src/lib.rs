@@ -1508,8 +1508,7 @@ mod tests {
         }
 
         fn sort_stable(vec: Vec<u8>) -> bool {
-            let mut vec = vec.clone();
-            let mut s: Vec<(usize, u8)>= vec.drain(..).enumerate().collect();
+            let mut s: Vec<(usize, u8)>= vec.into_iter().enumerate().collect();
             super::sort_by(&mut s, &|a: &(usize, u8), b: &(usize, u8)| a.1.cmp(&b.1));
             s.windows(2).all(|v| v[0].1 < v[1].1 || (v[0].1 == v[1].1 && v[0].0 < v[1].0))
         }
