@@ -1,0 +1,85 @@
+fn get_insert_pos(needle: &T, haystack: &[T])
+  gallop right from position 1
+}
+
+fn merge(mut b: &mut[T], mut i: usize) -> usize
+-- assert 0 < i < b.len() -- both sizes have non-zero length
+-- returns the position after the final position of Lmax
+// i == 1 only happens on a sub-merge (called from child)
+// in that case, we know we're not dealing with already sorted
+// data, so we can afford to perform a gallop starting at 1
+// without checking for already-sorted.
+if i == 1 {
+  let k = gallop_from_left(&b[0], &b[1..]) + 1;
+  let tmp = b[0];
+  move b[1..k] to b[0..k-1]
+  b[k-1] = tmp;
+  return k;
+}
+if &b[i - 1] < &b[i] {
+  // make already sorted only require one comparison
+  return i;
+}
+// assert i > 1
+// Get insertion position of R0 in L
+// We know k < i, since we checked above for already sorted.
+// We assume random data so gallop from the left
+let k = gallop_from_left(&b[i], &b[..i - 1]);
+// Everything before k is sorted and no longer needs to be considered.
+// Everything after k is > R0
+// we only know that the first value in R is < L0
+return child(&mut b, k, i, i + 1)
+
+
+fn child(b, g, i, d)
+-- g is start of L, i is start of R
+-- assert g < i < b.len() -- both sizes have non-zero length
+-- i < d <= b.len() is the index where all RHS elements before it are known to be < L0 (i.e. there may be later values < L0)
+-- returns the position after the final position of Lmax + acc
+// search for L0 in R
+d = get_insert_pos(&b[0], &b[d..]) + d;  // d is now the index where all R are < L0
+  -- b[i..i + k], b[0], 
+if d == b.len() {
+  // FKL i ABCDE d
+  // rotate b[..d] around i - ABCDEFKL
+  return d
+}
+if d  - i > i {
+  // FKL i ABCDE d GHI
+  // rotate b[..d] around i - g ABC i DEFKL d GHI
+  // b[..d - i + 1] are sorted - ABCDEF g KL id GHI
+  return Merge(&b[d - i + 1..], i - 1)
+}
+if d - i == i {
+  // FKL i ABC d GHI
+  swap // ABCFKL
+  // b[..d - i + 1] are sorted - ABCF KL GHI
+  return Merge(&b[d - i + 1..], i - 1)
+}
+if d - i < i {
+  -- if k - i < i: FKLMNOP i AB d GHI - ABF g MNOP i KL d GHI  - j = merge b[i..k], b[k..], child b[k - i + 1]
+  -- g FKL i AB d GHI -- ABF gi KL d GHI
+// All RHS elements before d are < L0    
+let tmp = b[g];
+let j = i;
+while j < d {
+    b[g] = b[j];
+    g += 1;
+    b[j] = b[g];
+    j += 1;
+}
+b[g] = tmp;
+g += 1;
+// ABF g MNOP i KL d GHI 
+// b[..g] are now sorted and no longer need to be considered
+  -- we moved n + 1 items in L
+  -- if i < n + 1...
+  -- if i == n + 1...
+  -- if i > n + 1:
+// b[i..k] are < b[n+1]
+if g == i {
+  return Merge(&mut b[i..], d - i)
+}
+let d = merge(&mut b[i..], d - i) + i;
+
+child(b, i, d)
