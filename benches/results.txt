@@ -1,62 +1,85 @@
 Git hash indicates the version of Rust being compared. _s = stable _u = unstable
 
-test large_ascending_29f5c699b_s         ... bench:       7,410 ns/iter (+/- 92) = 10796 MB/s
-test large_ascending_29f5c699b_u         ... bench:       7,127 ns/iter (+/- 152) = 11224 MB/s
-test large_ascending_gidsort             ... bench:      12,767 ns/iter (+/- 300) = 6266 MB/s
-test large_big_ascending_29f5c699b_s     ... bench:      78,086 ns/iter (+/- 896) = 16392 MB/s
-test large_big_ascending_29f5c699b_u     ... bench:      79,146 ns/iter (+/- 585) = 16172 MB/s
-test large_big_ascending_gidsort         ... bench:      82,862 ns/iter (+/- 779) = 15447 MB/s
-test large_big_descending_29f5c699b_s    ... bench:     137,594 ns/iter (+/- 1,386) = 9302 MB/s
-test large_big_descending_29f5c699b_u    ... bench:     138,661 ns/iter (+/- 4,211) = 9231 MB/s
-test large_big_descending_gidsort        ... bench:     665,402 ns/iter (+/- 13,247) = 1923 MB/s
-test large_big_random_29f5c699b_s        ... bench:   2,417,330 ns/iter (+/- 66,019) = 529 MB/s
-test large_big_random_29f5c699b_u        ... bench:   1,888,843 ns/iter (+/- 64,430) = 677 MB/s
-test large_big_random_gidsort            ... bench:   4,110,389 ns/iter (+/- 48,346) = 311 MB/s
-test large_descending_29f5c699b_s        ... bench:      10,661 ns/iter (+/- 87) = 7503 MB/s
-test large_descending_29f5c699b_u        ... bench:      10,630 ns/iter (+/- 116) = 7525 MB/s
-test large_descending_gidsort            ... bench:      88,007 ns/iter (+/- 1,062) = 909 MB/s
-test large_mostly_ascending_29f5c699b_s  ... bench:     199,359 ns/iter (+/- 2,463) = 401 MB/s
-test large_mostly_ascending_29f5c699b_u  ... bench:     100,184 ns/iter (+/- 1,552) = 798 MB/s
-test large_mostly_ascending_gidsort      ... bench:      94,230 ns/iter (+/- 991) = 848 MB/s
-test large_mostly_descending_29f5c699b_s ... bench:     206,554 ns/iter (+/- 4,221) = 387 MB/s
-test large_mostly_descending_29f5c699b_u ... bench:     110,396 ns/iter (+/- 5,093) = 724 MB/s
-test large_mostly_descending_gidsort     ... bench:     170,394 ns/iter (+/- 3,724) = 469 MB/s
-test large_random_29f5c699b_s            ... bench:   1,064,088 ns/iter (+/- 8,148) = 75 MB/s
-test large_random_29f5c699b_u            ... bench:     743,888 ns/iter (+/- 28,411) = 107 MB/s
-test large_random_gidsort                ... bench:   1,412,459 ns/iter (+/- 34,360) = 56 MB/s
-test large_short_runs_29f5c699b_s        ... bench:     122,659 ns/iter (+/- 788) = 652 MB/s
-test large_short_runs_29f5c699b_u        ... bench:     103,365 ns/iter (+/- 840) = 773 MB/s
-test large_short_runs_gidsort            ... bench:      84,847 ns/iter (+/- 2,272) = 942 MB/s
-test marenight_29f5c699b_s               ... bench:   1,606,429 ns/iter (+/- 108,497)
-test marenight_29f5c699b_u               ... bench:   4,611,414 ns/iter (+/- 130,279)
-test marenight_gidsort                   ... bench:   1,444,377 ns/iter (+/- 25,022)
-test medium_ascending_29f5c699b_s        ... bench:         150 ns/iter (+/- 0) = 5333 MB/s
-test medium_ascending_29f5c699b_u        ... bench:         122 ns/iter (+/- 1) = 6557 MB/s
-test medium_ascending_gidsort            ... bench:         144 ns/iter (+/- 1) = 5555 MB/s
-test medium_descending_29f5c699b_s       ... bench:         182 ns/iter (+/- 1) = 4395 MB/s
-test medium_descending_29f5c699b_u       ... bench:         152 ns/iter (+/- 6) = 5263 MB/s
-test medium_descending_gidsort           ... bench:         698 ns/iter (+/- 10) = 1146 MB/s
-test medium_random_29f5c699b_s           ... bench:       8,001 ns/iter (+/- 73) = 99 MB/s
-test medium_random_29f5c699b_u           ... bench:       7,052 ns/iter (+/- 67) = 113 MB/s
-test medium_random_gidsort               ... bench:       9,298 ns/iter (+/- 134) = 86 MB/s
-test nightmare_29f5c699b_s               ... bench:   1,310,067 ns/iter (+/- 23,345)
-test nightmare_29f5c699b_u               ... bench:   4,116,805 ns/iter (+/- 102,445)
-test nightmare_gidsort                   ... bench:   1,088,718 ns/iter (+/- 16,433)
-test small_ascending_29f5c699b_s         ... bench:          46 ns/iter (+/- 0) = 1739 MB/s
-test small_ascending_29f5c699b_u         ... bench:          45 ns/iter (+/- 0) = 1777 MB/s
-test small_ascending_gidsort             ... bench:          45 ns/iter (+/- 4) = 1777 MB/s
-test small_big_ascending_29f5c699b_s     ... bench:         109 ns/iter (+/- 1) = 11743 MB/s
-test small_big_ascending_29f5c699b_u     ... bench:         111 ns/iter (+/- 1) = 11531 MB/s
-test small_big_ascending_gidsort         ... bench:          98 ns/iter (+/- 0) = 13061 MB/s
-test small_big_descending_29f5c699b_s    ... bench:         274 ns/iter (+/- 9) = 4671 MB/s
-test small_big_descending_29f5c699b_u    ... bench:         271 ns/iter (+/- 1) = 4723 MB/s
-test small_big_descending_gidsort        ... bench:         250 ns/iter (+/- 2) = 5120 MB/s
-test small_big_random_29f5c699b_s        ... bench:       1,006 ns/iter (+/- 15) = 1272 MB/s
-test small_big_random_29f5c699b_u        ... bench:         995 ns/iter (+/- 83) = 1286 MB/s
-test small_big_random_gidsort            ... bench:       1,110 ns/iter (+/- 93) = 1153 MB/s
-test small_descending_29f5c699b_s        ... bench:          77 ns/iter (+/- 0) = 1038 MB/s
-test small_descending_29f5c699b_u        ... bench:          70 ns/iter (+/- 0) = 1142 MB/s
-test small_descending_gidsort            ... bench:          81 ns/iter (+/- 1) = 987 MB/s
-test small_random_29f5c699b_s            ... bench:         766 ns/iter (+/- 54) = 104 MB/s
-test small_random_29f5c699b_u            ... bench:         773 ns/iter (+/- 35) = 103 MB/s
-test small_random_gidsort                ... bench:         840 ns/iter (+/- 82) = 95 MB/s
+test large_ascending_2773383a3_s         ... bench:       6,170 ns/iter (+/- 70) = 12965 MB/s
+test large_ascending_2773383a3_u         ... bench:       3,698 ns/iter (+/- 41) = 21633 MB/s
+test large_ascending_gidsort             ... bench:       8,116 ns/iter (+/- 366) = 9857 MB/s
+test large_ascending_glidesort           ... bench:       7,552 ns/iter (+/- 85) = 10593 MB/s
+test large_big_ascending_2773383a3_s     ... bench:      36,926 ns/iter (+/- 2,470) = 34663 MB/s
+test large_big_ascending_2773383a3_u     ... bench:      40,831 ns/iter (+/- 6,773) = 31348 MB/s
+test large_big_ascending_gidsort         ... bench:      41,448 ns/iter (+/- 1,391) = 30882 MB/s
+test large_big_ascending_glidesort       ... bench:      39,010 ns/iter (+/- 4,546) = 32812 MB/s
+test large_big_descending_2773383a3_s    ... bench:      62,531 ns/iter (+/- 5,031) = 20469 MB/s
+test large_big_descending_2773383a3_u    ... bench:      63,840 ns/iter (+/- 5,624) = 20050 MB/s
+test large_big_descending_gidsort        ... bench:     378,948 ns/iter (+/- 5,578) = 3377 MB/s
+test large_big_descending_glidesort      ... bench:      58,249 ns/iter (+/- 4,634) = 21974 MB/s
+test large_big_random_2773383a3_s        ... bench:   1,077,400 ns/iter (+/- 15,648) = 1188 MB/s
+test large_big_random_2773383a3_u        ... bench:     557,166 ns/iter (+/- 10,260) = 2297 MB/s
+test large_big_random_gidsort            ... bench:   1,955,015 ns/iter (+/- 25,862) = 654 MB/s
+test large_big_random_glidesort          ... bench:     715,966 ns/iter (+/- 18,258) = 1787 MB/s
+test large_descending_2773383a3_s        ... bench:       7,590 ns/iter (+/- 107) = 10540 MB/s
+test large_descending_2773383a3_u        ... bench:       5,109 ns/iter (+/- 69) = 15658 MB/s
+test large_descending_gidsort            ... bench:      95,537 ns/iter (+/- 787) = 837 MB/s
+test large_descending_glidesort          ... bench:       6,474 ns/iter (+/- 90) = 12357 MB/s
+test large_mostly_ascending_2773383a3_s  ... bench:     147,447 ns/iter (+/- 2,832) = 542 MB/s
+test large_mostly_ascending_2773383a3_u  ... bench:      52,041 ns/iter (+/- 975) = 1537 MB/s
+test large_mostly_ascending_gidsort      ... bench:      61,712 ns/iter (+/- 624) = 1296 MB/s
+test large_mostly_ascending_glidesort    ... bench:     153,429 ns/iter (+/- 1,853) = 521 MB/s
+test large_mostly_descending_2773383a3_s ... bench:     155,578 ns/iter (+/- 1,628) = 514 MB/s
+test large_mostly_descending_2773383a3_u ... bench:      58,396 ns/iter (+/- 1,751) = 1369 MB/s
+test large_mostly_descending_gidsort     ... bench:     138,698 ns/iter (+/- 2,052) = 576 MB/s
+test large_mostly_descending_glidesort   ... bench:     148,886 ns/iter (+/- 2,368) = 537 MB/s
+test large_random_2773383a3_s            ... bench:     416,990 ns/iter (+/- 8,051) = 191 MB/s
+test large_random_2773383a3_u            ... bench:     264,095 ns/iter (+/- 3,037) = 302 MB/s
+test large_random_gidsort                ... bench:     907,613 ns/iter (+/- 8,223) = 88 MB/s
+test large_random_glidesort              ... bench:     262,882 ns/iter (+/- 4,919) = 304 MB/s
+test large_short_runs_2773383a3_s        ... bench:     173,655 ns/iter (+/- 2,437) = 460 MB/s
+test large_short_runs_2773383a3_u        ... bench:      51,700 ns/iter (+/- 6,659) = 1547 MB/s
+test large_short_runs_gidsort            ... bench:      81,234 ns/iter (+/- 1,406) = 984 MB/s
+test large_short_runs_glidesort          ... bench:     146,164 ns/iter (+/- 1,708) = 547 MB/s
+test marenight_2773383a3_s               ... bench:     812,394 ns/iter (+/- 8,234)
+test marenight_2773383a3_u               ... bench:   2,501,191 ns/iter (+/- 60,868)
+test marenight_gidsort                   ... bench:     595,030 ns/iter (+/- 8,251)
+test marenight_glidesort                 ... bench:     703,863 ns/iter (+/- 8,672)
+test medium_ascending_2773383a3_s        ... bench:          95 ns/iter (+/- 1) = 8421 MB/s
+test medium_ascending_2773383a3_u        ... bench:          59 ns/iter (+/- 3) = 13559 MB/s
+test medium_ascending_gidsort            ... bench:          97 ns/iter (+/- 18) = 8247 MB/s
+test medium_ascending_glidesort          ... bench:          70 ns/iter (+/- 1) = 11428 MB/s
+test medium_descending_2773383a3_s       ... bench:         103 ns/iter (+/- 1) = 7766 MB/s
+test medium_descending_2773383a3_u       ... bench:          69 ns/iter (+/- 21) = 11594 MB/s
+test medium_descending_gidsort           ... bench:         813 ns/iter (+/- 15) = 984 MB/s
+test medium_descending_glidesort         ... bench:          81 ns/iter (+/- 1) = 9876 MB/s
+test medium_random_2773383a3_s           ... bench:       2,782 ns/iter (+/- 31) = 287 MB/s
+test medium_random_2773383a3_u           ... bench:       2,417 ns/iter (+/- 41) = 330 MB/s
+test medium_random_gidsort               ... bench:       4,730 ns/iter (+/- 74) = 169 MB/s
+test medium_random_glidesort             ... bench:       2,089 ns/iter (+/- 25) = 382 MB/s
+test nightmare_2773383a3_s               ... bench:     671,199 ns/iter (+/- 12,984)
+test nightmare_2773383a3_u               ... bench:   2,317,922 ns/iter (+/- 23,388)
+test nightmare_gidsort                   ... bench:     529,237 ns/iter (+/- 17,390)
+test nightmare_glidesort                 ... bench:     691,004 ns/iter (+/- 36,263)
+test small_ascending_2773383a3_s         ... bench:          15 ns/iter (+/- 0) = 5333 MB/s
+test small_ascending_2773383a3_u         ... bench:          15 ns/iter (+/- 0) = 5333 MB/s
+test small_ascending_gidsort             ... bench:          16 ns/iter (+/- 0) = 5000 MB/s
+test small_ascending_glidesort           ... bench:          34 ns/iter (+/- 1) = 2352 MB/s
+test small_big_ascending_2773383a3_s     ... bench:          54 ns/iter (+/- 0) = 23703 MB/s
+test small_big_ascending_2773383a3_u     ... bench:          54 ns/iter (+/- 0) = 23703 MB/s
+test small_big_ascending_gidsort         ... bench:          69 ns/iter (+/- 1) = 18550 MB/s
+test small_big_ascending_glidesort       ... bench:         133 ns/iter (+/- 3) = 9624 MB/s
+test small_big_descending_2773383a3_s    ... bench:         187 ns/iter (+/- 2) = 6844 MB/s
+test small_big_descending_2773383a3_u    ... bench:         184 ns/iter (+/- 2) = 6956 MB/s
+test small_big_descending_gidsort        ... bench:         165 ns/iter (+/- 2) = 7757 MB/s
+test small_big_descending_glidesort      ... bench:         150 ns/iter (+/- 3) = 8533 MB/s
+test small_big_random_2773383a3_s        ... bench:         347 ns/iter (+/- 15) = 3688 MB/s
+test small_big_random_2773383a3_u        ... bench:         342 ns/iter (+/- 16) = 3742 MB/s
+test small_big_random_gidsort            ... bench:         411 ns/iter (+/- 13) = 3114 MB/s
+test small_big_random_glidesort          ... bench:         309 ns/iter (+/- 7) = 4142 MB/s
+test small_descending_2773383a3_s        ... bench:          32 ns/iter (+/- 1) = 2500 MB/s
+test small_descending_2773383a3_u        ... bench:          29 ns/iter (+/- 1) = 2758 MB/s
+test small_descending_gidsort            ... bench:          68 ns/iter (+/- 1) = 1176 MB/s
+test small_descending_glidesort          ... bench:          35 ns/iter (+/- 0) = 2285 MB/s
+test small_random_2773383a3_s            ... bench:         248 ns/iter (+/- 3) = 322 MB/s
+test small_random_2773383a3_u            ... bench:         240 ns/iter (+/- 4) = 333 MB/s
+test small_random_gidsort                ... bench:         323 ns/iter (+/- 3) = 247 MB/s
+test small_random_glidesort              ... bench:         217 ns/iter (+/- 5) = 368 MB/s
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 80 measured; 0 filtered out; finished in 64.59s
+
