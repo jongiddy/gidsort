@@ -88,6 +88,16 @@ fn merge101(mut b: &mut[T], mut i: usize) -> usize
     }
   }
 
+previous search returns n items before inserion point
+
+gallop starts at next_power_of_two(n ) - 1
+0 => 0
+1 => 0
+2 => 1
+3 => 3
+4 => 3
+5 => 7
+6 => 7
 
 fn child(b, g, i, d)
 // search for L0 in R

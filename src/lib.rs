@@ -1,11 +1,10 @@
 #![feature(stmt_expr_attributes)]
-#![feature(swap_nonoverlapping)]
-#![feature(pointer_methods)]
 
 extern crate gcd;
 
 use std::cmp::min;
 use std::cmp::Ordering;
+use std::mem::MaybeUninit;
 
 use gcd::Gcd;
 
@@ -33,10 +32,9 @@ const RECURSION_LIMIT: u32 = MAX_RECURSION_LIMIT;
 // The maximum GCD for which reverse is used to rotate. Above this value, block swapping is used.
 const ROTATE_REVERSE_MAX: usize = 4;
 
-
-fn gallop_right<T, F>(value: &T, buffer: &[T], compare: &F) -> usize
+fn gallop_from_left<T, F>(value: &T, buffer: &[T], compare: &F) -> usize
 where
-    F: Fn(&T, &T) -> Ordering
+    F: Fn(&T, &T) -> Ordering,
 {
     // Find the insertion point in an ordered buffer where the value should be inserted to maintain
     // the ordering.  All elements to the left of the insertion point are Less than the value and
@@ -47,8 +45,8 @@ where
     // returns Equal, the function returns immediately with one (of possibly many) valid insertion
     // points. This is useful for unstable sort.
     let length = buffer.len();
-    let mut lo = 0;       // lowest candidate
-    let mut hi = length;  // highest candidate
+    let mut lo = 0; // lowest candidate
+    let mut hi = length; // highest candidate
 
     // First, gallop from the start of the sequence.  Galloping provides a middle ground between
     // pure binary search, which uses log2 n comparisons to find any position, and linear search,
@@ -69,13 +67,13 @@ where
             Ordering::Less => {
                 hi = trial;
                 break;
-            },
+            }
             Ordering::Greater => {
                 lo = trial + 1;
                 interval *= 2;
-            },
-            Ordering::Equal => {
-                #![cold]
+            }
+            Ordering::Equal =>
+            {
                 return trial;
             }
         }
@@ -85,19 +83,19 @@ where
     // lo-hi contains 2^n - 1 elements containing the correct position.  2^n - 1 elements gives us
     // a balanced binary tree.  Perform binary search to find the final insertion position.
     debug_assert!(hi == length || (hi - lo + 1).is_power_of_two());
-    binary_search(value, &buffer[.. hi], lo, compare)
+    binary_search(value, &buffer[..hi], lo, compare)
 }
 
 fn gallop_left<T, F>(value: &T, buffer: &[T], compare: &F) -> usize
 where
-    F: Fn(&T, &T) -> Ordering
+    F: Fn(&T, &T) -> Ordering,
 {
     // like gallop_right, but start from the end of the sequence.  There is a slight difference
     // in that when length == 2^n then `interval < trial` does not examine the far end before
     // dropping to binary search.  This doesn't appear to make much difference in practice.
     let length = buffer.len();
-    let mut lo = 0;       // lowest candidate
-    let mut hi = length;  // highest candidate
+    let mut lo = 0; // lowest candidate
+    let mut hi = length; // highest candidate
 
     if buffer.is_empty() {
         return 0;
@@ -110,13 +108,13 @@ where
             Ordering::Less => {
                 hi = trial;
                 interval *= 2;
-            },
+            }
             Ordering::Greater => {
                 lo = trial + 1;
                 break;
-            },
-            Ordering::Equal => {
-                #![cold]
+            }
+            Ordering::Equal =>
+            {
                 return trial;
             }
         }
@@ -126,30 +124,30 @@ where
     // lo-hi contains 2^n - 1 elements containing the correct position.  2^n - 1 elements gives us
     // a balanced binary tree.  Perform binary search to find the final insertion position.
     debug_assert!(lo == 0 || (hi - lo + 1).is_power_of_two());
-    binary_search(value, &buffer[.. hi], lo, compare)
+    binary_search(value, &buffer[..hi], lo, compare)
 }
 
 fn binary_search<T, F>(value: &T, buffer: &[T], start: usize, compare: &F) -> usize
 where
-    F: Fn(&T, &T) -> Ordering
+    F: Fn(&T, &T) -> Ordering,
 {
     let length = buffer.len();
-    let mut lo = start;   // lowest candidate
-    let mut hi = length;  // highest candidate
+    let mut lo = start; // lowest candidate
+    let mut hi = length; // highest candidate
     while hi > lo {
         let trial = lo + (hi - lo) / 2;
         debug_assert!(trial < length);
-        match unsafe{ compare(value, &buffer.get_unchecked(trial)) } {
+        match unsafe { compare(value, &buffer.get_unchecked(trial)) } {
             Ordering::Less => {
                 hi = trial;
-            },
+            }
             Ordering::Greater => {
                 lo = trial + 1;
-            },
-            Ordering::Equal => {
-                #![cold]
+            }
+            Ordering::Equal =>
+            {
                 return trial;
-            },
+            }
         }
     }
     debug_assert!(lo == hi);
@@ -179,8 +177,8 @@ fn swap_ends<T>(s: &mut [T], k: usize) {
 }
 
 fn add_modulo<T>(a: T, b: T, n: T) -> T
-    where
-        T: std::ops::Add<Output=T> + std::ops::Sub<Output=T> + Copy + PartialOrd
+where
+    T: std::ops::Add<Output = T> + std::ops::Sub<Output = T> + Copy + PartialOrd,
 {
     // Return (a + b) % n
     // Faster than using the % operator, does not overflow
@@ -193,8 +191,7 @@ fn add_modulo<T>(a: T, b: T, n: T) -> T
         // Hence: n <= a + b <= 2n - 1  ->  0 < a + b - n < n - 1
         // a + b - n  =  b - n + a  =  b - (n - a)  =  b - c
         b - c
-    }
-    else {
+    } else {
         // if b < n - a, then b + a < n, and in the modulo range
         a + b
     }
@@ -214,13 +211,13 @@ fn rotate_gcd<T>(s: &mut [T], k: usize) {
         // If GCD is low, then we tend to stride through the slice moving a few elements at a
         // time.  In this case, the classic reverse everything twice algorithm performs faster.
         s.reverse();
-        s[.. k].reverse();
-        s[k ..].reverse();
+        s[..k].reverse();
+        s[k..].reverse();
     } else {
         // Otherwise, we move each block up by k positions, using the first block as working space.
         let mut j = k;
-        for _ in 0 .. slen / blksize - 1 {
-            swap_ends(&mut s[0 .. j + blksize], blksize);
+        for _ in 0..slen / blksize - 1 {
+            swap_ends(&mut s[0..j + blksize], blksize);
             j = add_modulo(j, k, slen);
         }
         debug_assert!(j == 0);
@@ -283,28 +280,27 @@ fn rotate<T>(s: &mut [T], rlen: usize) {
         Ordering::Less => {
             if llen <= stack_slice_max!(T) {
                 rotate_left_shift(s, llen);
-                return
+                return;
             }
-        },
+        }
         Ordering::Greater => {
             if rlen <= stack_slice_max!(T) {
                 rotate_right_shift(s, rlen);
-                return
+                return;
             }
-        },
+        }
         Ordering::Equal => {
             swap_ends(s, llen);
-            return
+            return;
         }
     }
     rotate_gcd(s, rlen);
 }
 
-
 fn trim<T, F, G>(l: &[T], r: &[T], cmpleftright: &F, cmprightleft: &G) -> Option<(usize, usize)>
 where
     F: Fn(&T, &T) -> Ordering,
-    G: Fn(&T, &T) -> Ordering
+    G: Fn(&T, &T) -> Ordering,
 {
     // Trim the low elements in L and high elements in R that are in their final position.
     //
@@ -334,32 +330,56 @@ where
 
     // Find insertion point of r[0] in L and trim off lower values, which are in final position,
     // leaving r[0] as lowest value.  From above, l[max] > r[0], so exclude r[0] from search.
-    let left = gallop_right(r.first().unwrap(), &l[.. l.len() - 1], cmprightleft);
+    let left = gallop_from_left(r.first().unwrap(), &l[..l.len() - 1], cmprightleft);
 
     Some((left, right))
 }
 
-fn merge_inplace<T, F, G>(s: &mut [T], split: usize, cmpleftright: &F, cmprightleft: &G, recurse: u32)
-where
+fn merge_inplace<T, F, G>(
+    s: &mut [T],
+    split: usize,
+    cmpleftright: &F,
+    cmprightleft: &G,
+    recurse: u32,
+) where
     T: std::fmt::Debug,
     F: Fn(&T, &T) -> Ordering,
-    G: Fn(&T, &T) -> Ordering
+    G: Fn(&T, &T) -> Ordering,
 {
     if let Some((left, right)) = trim(&s[..split], &s[split..], cmpleftright, cmprightleft) {
         debug!("\nS={:?}", s);
-        merge_trimmed(&mut s[left .. split + right], split - left, cmpleftright, cmprightleft, recurse);
+        merge_trimmed(
+            &mut s[left..split + right],
+            split - left,
+            cmpleftright,
+            cmprightleft,
+            recurse,
+        );
         debug!("S={:?}\n", s);
     }
 }
 
-fn merge_trimmed<T, F, G>(s: &mut [T], split: usize, cmpleftright: &F, cmprightleft: &G, recurse: u32)
-where
+fn merge_trimmed<T, F, G>(
+    s: &mut [T],
+    split: usize,
+    cmpleftright: &F,
+    cmprightleft: &G,
+    recurse: u32,
+) where
     T: std::fmt::Debug,
     F: Fn(&T, &T) -> Ordering,
-    G: Fn(&T, &T) -> Ordering
+    G: Fn(&T, &T) -> Ordering,
 {
-    macro_rules! llen {() => (split)}
-    macro_rules! rlen {() => (s.len() - split)}
+    macro_rules! llen {
+        () => {
+            split
+        };
+    }
+    macro_rules! rlen {
+        () => {
+            s.len() - split
+        };
+    }
 
     if stack_slice_max!(T) > 1 && llen!() <= stack_slice_max!(T) {
         merge_left(s, split, cmpleftright, cmprightleft);
@@ -392,7 +412,7 @@ fn merge_left<T, F, G>(s: &mut [T], split: usize, cmpleftright: &F, cmprightleft
 where
     T: std::fmt::Debug,
     F: Fn(&T, &T) -> Ordering,
-    G: Fn(&T, &T) -> Ordering
+    G: Fn(&T, &T) -> Ordering,
 {
     // Perform a merge by moving the left side of the merge to a stack slice, and then
     // merging it and the right towards the left side of the original buffer.
@@ -409,24 +429,40 @@ where
         let mut tmp = stack_slice_unsafe!([T; split]);
         std::ptr::copy_nonoverlapping(s.as_ptr(), tmp.as_mut_ptr() as *mut T, split);
         let mut l = std::slice::from_raw_parts(tmp.as_ptr() as *const T, split);
-        let mut hole = CopyOnDrop {src: l.as_ptr(), dest: s.as_mut_ptr(), len: l.len()};
-        let mut r = &s[split ..];
-        debug!("merge_left S {:?} H {:?} R {:?} / L {:?}", &s[..s.len()-r.len()-hole.len], &s[s.len()-r.len()-hole.len..s.len()-r.len()], r, l);
+        let mut hole = CopyOnDrop {
+            src: l.as_ptr(),
+            dest: s.as_mut_ptr(),
+            len: l.len(),
+        };
+        let mut r = &s[split..];
+        debug!(
+            "merge_left S {:?} H {:?} R {:?} / L {:?}",
+            &s[..s.len() - r.len() - hole.len],
+            &s[s.len() - r.len() - hole.len..s.len() - r.len()],
+            r,
+            l
+        );
         while l.len() > 1 {
-            let xlen = gallop_right(&l[0], &r[1 ..], cmpleftright) + 1;
+            let xlen = gallop_from_left(&l[0], &r[1..], cmpleftright) + 1;
             if xlen == r.len() {
                 break;
             }
-            let zlen = gallop_right(&r[xlen], &l[1 .. l.len() - 1], cmprightleft) + 1;
+            let zlen = gallop_from_left(&r[xlen], &l[1..l.len() - 1], cmprightleft) + 1;
             std::ptr::copy(r.as_ptr(), hole.dest, xlen);
-            r = &r[xlen ..];
+            r = &r[xlen..];
             hole.dest = hole.dest.add(xlen);
             std::ptr::copy_nonoverlapping(l.as_ptr(), hole.dest, zlen);
-            l = &l[zlen ..];
+            l = &l[zlen..];
             hole.src = l.as_ptr();
             hole.dest = hole.dest.add(zlen);
             hole.len -= zlen;
-            debug!("merge_left S {:?} - H {:?} - R {:?} / L {:?}", &s[..s.len()-r.len()-hole.len], &s[s.len()-r.len()-hole.len..s.len()-r.len()], r, l);
+            debug!(
+                "merge_left S {:?} - H {:?} - R {:?} / L {:?}",
+                &s[..s.len() - r.len() - hole.len],
+                &s[s.len() - r.len() - hole.len..s.len() - r.len()],
+                r,
+                l
+            );
         }
         debug_assert!(r.len() > 0);
         debug_assert!(l.len() > 0);
@@ -440,7 +476,7 @@ fn merge_right<T, F, G>(s: &mut [T], split: usize, cmpleftright: &F, cmprightlef
 where
     T: std::fmt::Debug,
     F: Fn(&T, &T) -> Ordering,
-    G: Fn(&T, &T) -> Ordering
+    G: Fn(&T, &T) -> Ordering,
 {
     // Perform a merge by moving the right side of the merge to a stack slice, and then
     // merging it and the left towards the right side of the original buffer.
@@ -458,22 +494,47 @@ where
         let mut tmp = stack_slice_unsafe!([T; rlen]);
         std::ptr::copy_nonoverlapping(s.as_ptr().add(split), tmp.as_mut_ptr() as *mut T, rlen);
         let mut r = std::slice::from_raw_parts(tmp.as_ptr() as *const T, rlen);
-        let mut hole = CopyOnDrop {src: r.as_ptr(), dest: s.as_mut_ptr().add(split), len: r.len()};
-        let mut l = &s[.. split];
-        debug!("merge_right L {:?} - H {:?} - S {:?} / R {:?}", l, &s[l.len()..l.len()+hole.len], &s[l.len()+hole.len..], r);
+        let mut hole = CopyOnDrop {
+            src: r.as_ptr(),
+            dest: s.as_mut_ptr().add(split),
+            len: r.len(),
+        };
+        let mut l = &s[..split];
+        debug!(
+            "merge_right L {:?} - H {:?} - S {:?} / R {:?}",
+            l,
+            &s[l.len()..l.len() + hole.len],
+            &s[l.len() + hole.len..],
+            r
+        );
         while r.len() > 1 {
-            let xlen = l.len() - gallop_left(r.last().unwrap(), &l[.. l.len() - 1], cmprightleft);
+            let xlen = l.len() - gallop_left(r.last().unwrap(), &l[..l.len() - 1], cmprightleft);
             if xlen == l.len() {
                 break;
             }
-            let zlen = r.len() - (gallop_left(&l[l.len() - xlen - 1], &r[1 .. r.len() - 1], cmpleftright) + 1);
+            let zlen = r.len()
+                - (gallop_left(&l[l.len() - xlen - 1], &r[1..r.len() - 1], cmpleftright) + 1);
             hole.dest = hole.dest.sub(xlen);
-            std::ptr::copy(l.as_ptr().add(l.len() - xlen), hole.dest.add(hole.len), xlen);
-            l = &l[.. l.len() - xlen];
+            std::ptr::copy(
+                l.as_ptr().add(l.len() - xlen),
+                hole.dest.add(hole.len),
+                xlen,
+            );
+            l = &l[..l.len() - xlen];
             hole.len -= zlen;
-            std::ptr::copy_nonoverlapping(r.as_ptr().add(r.len() - zlen), hole.dest.add(hole.len), zlen);
-            r = &r[.. r.len() - zlen];
-            debug!("merge_right L {:?} - H {:?} - S {:?} / R {:?}", l, &s[l.len()..l.len()+hole.len], &s[l.len()+hole.len..], r);
+            std::ptr::copy_nonoverlapping(
+                r.as_ptr().add(r.len() - zlen),
+                hole.dest.add(hole.len),
+                zlen,
+            );
+            r = &r[..r.len() - zlen];
+            debug!(
+                "merge_right L {:?} - H {:?} - S {:?} / R {:?}",
+                l,
+                &s[l.len()..l.len() + hole.len],
+                &s[l.len() + hole.len..],
+                r
+            );
         }
         debug_assert!(l.len() > 0);
         debug_assert!(r.len() > 0);
@@ -483,18 +544,31 @@ where
     }
 }
 
-fn merge_recurse<T, F, G>(s: &mut [T], split: usize, cmpleftright: &F, cmprightleft: &G, recurse: u32)
-where
+fn merge_recurse<T, F, G>(
+    s: &mut [T],
+    split: usize,
+    cmpleftright: &F,
+    cmprightleft: &G,
+    recurse: u32,
+) where
     T: std::fmt::Debug,
     F: Fn(&T, &T) -> Ordering,
-    G: Fn(&T, &T) -> Ordering
+    G: Fn(&T, &T) -> Ordering,
 {
     let mut left = 0;
     let mut split = split;
     let right = s.len();
 
-    macro_rules! llen {() => (split - left)}
-    macro_rules! rlen {() => (right - split)}
+    macro_rules! llen {
+        () => {
+            split - left
+        };
+    }
+    macro_rules! rlen {
+        () => {
+            right - split
+        };
+    }
 
     // 1. |L| > 0
     debug_assert!(llen!() > 0);
@@ -507,62 +581,85 @@ where
 
     let mut highwater = 1; // elements of R known to be < l_0
 
-    debug!("merge_recurse S {:?} - L {:?} - M {:?} - R {:?}", &s[..left], &s[left..split], &s[split..split+highwater], &s[split+highwater..]);
+    debug!(
+        "merge_recurse S {:?} - L {:?} - M {:?} - R {:?}",
+        &s[..left],
+        &s[left..split],
+        &s[split..split + highwater],
+        &s[split + highwater..]
+    );
     while llen!() > 1 && rlen!() > highwater {
-        let xlen = gallop_right(&s[left], &s[split + highwater .. right], cmpleftright) + highwater;
+        let xlen =
+            gallop_from_left(&s[left], &s[split + highwater..right], cmpleftright) + highwater;
         if xlen == rlen!() {
-            break
+            break;
         }
         // find Z in L where Z[i] < R'[0]
         // - Since L[max] > R[max], exclude L[max] from search
         // - Since R[split + xlen] > L[0] from previous search, exclude L[0] from search
         // - this search relies on invariant |L| > 1, tested in loop condition
-        let zlen = gallop_right(&s[split + xlen], &s[left + 1 .. split - 1], cmprightleft) + 1;
+        let zlen = gallop_from_left(&s[split + xlen], &s[left + 1..split - 1], cmprightleft) + 1;
 
         if llen!() <= xlen + zlen {
-            rotate(&mut s[left .. split + xlen], xlen);
+            rotate(&mut s[left..split + xlen], xlen);
             left += xlen + zlen;
             split += xlen;
             highwater = 1;
         } else if zlen < xlen {
-            swap_ends(&mut s[left .. split + xlen], xlen);
+            swap_ends(&mut s[left..split + xlen], xlen);
             left += xlen;
             let ml = split + zlen;
             let ms = xlen - zlen;
-            let mr = gallop_right(
+            let mr = gallop_from_left(
                 &s[split + xlen - 1],
-                &s[split + xlen + 1 .. right],
-                cmpleftright
-            ) + split + xlen + 1;
-            merge_trimmed(&mut s[ml .. mr], ms, cmpleftright, cmprightleft, recurse);
+                &s[split + xlen + 1..right],
+                cmpleftright,
+            ) + split
+                + xlen
+                + 1;
+            merge_trimmed(&mut s[ml..mr], ms, cmpleftright, cmprightleft, recurse);
             highwater = mr - split;
         } else {
-            swap_ends(&mut s[left + zlen - xlen .. split + xlen], xlen);
+            swap_ends(&mut s[left + zlen - xlen..split + xlen], xlen);
             if zlen != xlen {
-                rotate(&mut s[left .. left + zlen], xlen);
+                rotate(&mut s[left..left + zlen], xlen);
             }
             left += zlen;
             highwater = xlen + 1;
         }
-        debug!("merge_recurse S {:?} - L {:?} - M {:?} - R {:?}", &s[..left], &s[left..split], &s[split..split+highwater], &s[split+highwater..]);
+        debug!(
+            "merge_recurse S {:?} - L {:?} - M {:?} - R {:?}",
+            &s[..left],
+            &s[left..split],
+            &s[split..split + highwater],
+            &s[split + highwater..]
+        );
     }
     // since r_0..r_highwater are < l_0, we just need to swap L and R
     // since l_max is largest value, if |L| = 1, we just need to swap L and R
-    rotate(&mut s[left .. right], rlen!());
+    rotate(&mut s[left..right], rlen!());
 }
 
 fn merge_final<T, F, G>(s: &mut [T], split: usize, cmpleftright: &F, cmprightleft: &G)
 where
     T: std::fmt::Debug,
     F: Fn(&T, &T) -> Ordering,
-    G: Fn(&T, &T) -> Ordering
+    G: Fn(&T, &T) -> Ordering,
 {
     let mut left = 0;
     let mut split = split;
     let right = s.len();
 
-    macro_rules! llen {() => (split - left)}
-    macro_rules! rlen {() => (right - split)}
+    macro_rules! llen {
+        () => {
+            split - left
+        };
+    }
+    macro_rules! rlen {
+        () => {
+            right - split
+        };
+    }
 
     // 1. |L| > 0
     debug_assert!(llen!() > 0);
@@ -575,41 +672,54 @@ where
 
     let mut highwater = 1; // elements of R known to be < l_0
 
-    debug!("merge_final S {:?} - L {:?} - M {:?} - R {:?}", &s[..left], &s[left..split], &s[split..split+highwater], &s[split+highwater..]);
+    debug!(
+        "merge_final S {:?} - L {:?} - M {:?} - R {:?}",
+        &s[..left],
+        &s[left..split],
+        &s[split..split + highwater],
+        &s[split + highwater..]
+    );
     while llen!() > 1 && rlen!() > highwater {
-        let xlen = gallop_right(&s[left], &s[split + highwater .. right], cmpleftright) + highwater;
+        let xlen =
+            gallop_from_left(&s[left], &s[split + highwater..right], cmpleftright) + highwater;
         if xlen == rlen!() {
-            break
+            break;
         }
         // find Z in L where Z[i] < R'[0]
         // - Since L[max] > R[max], exclude L[max] from search
         // - Since R[split + xlen] > L[0] from previous search, exclude L[0] from search
         // - this search relies on invariant |L| > 1, tested in loop condition
-        let zlen = gallop_right(&s[split + xlen], &s[left + 1 .. split - 1], cmprightleft) + 1;
+        let zlen = gallop_from_left(&s[split + xlen], &s[left + 1..split - 1], cmprightleft) + 1;
 
         if llen!() <= xlen + zlen {
-            rotate(&mut s[left .. split + xlen], xlen);
+            rotate(&mut s[left..split + xlen], xlen);
             left += xlen + zlen;
             split += xlen;
             highwater = 1;
         } else if zlen < xlen {
-            swap_ends(&mut s[left .. split + zlen], zlen);
-            rotate(&mut s[split .. split + xlen], xlen - zlen);
+            swap_ends(&mut s[left..split + zlen], zlen);
+            rotate(&mut s[split..split + xlen], xlen - zlen);
             left += zlen;
             highwater = xlen + 1;
         } else {
-            swap_ends(&mut s[left + zlen - xlen .. split + xlen], xlen);
+            swap_ends(&mut s[left + zlen - xlen..split + xlen], xlen);
             if zlen != xlen {
-                rotate(&mut s[left .. left + zlen], xlen);
+                rotate(&mut s[left..left + zlen], xlen);
             }
             left += zlen;
             highwater = xlen + 1;
         }
-        debug!("merge_final S {:?} - L {:?} - M {:?} - R {:?}", &s[..left], &s[left..split], &s[split..split+highwater], &s[split+highwater..]);
+        debug!(
+            "merge_final S {:?} - L {:?} - M {:?} - R {:?}",
+            &s[..left],
+            &s[left..split],
+            &s[split..split + highwater],
+            &s[split + highwater..]
+        );
     }
     // since r_0..r_highwater are < l_0, we just need to swap L and R
     // since l_max is largest value, if |L| = 1, we just need to swap L and R
-    rotate(&mut s[left .. right], rlen!());
+    rotate(&mut s[left..right], rlen!());
 }
 
 fn rotate_right_1<T>(s: &mut [T]) {
@@ -624,14 +734,94 @@ fn rotate_right_1<T>(s: &mut [T]) {
     }
 }
 
+fn merge<T, F, G>(b: &mut [T], i: usize, cmpleftright: &F, cmprightleft: &G) -> usize
+where
+    T: std::fmt::Debug,
+    F: Fn(&T, &T) -> Ordering,
+    G: Fn(&T, &T) -> Ordering,
+{
+    if i == 0 || i == b.len() {
+        return b.len();
+    }
+    merge101(b, i, cmpleftright, cmprightleft)
+}
+
+fn merge101<T, F, G>(b: &mut [T], mut i: usize, cmpleftright: &F, cmprightleft: &G) -> usize
+where
+    T: std::fmt::Debug,
+    F: Fn(&T, &T) -> Ordering,
+    G: Fn(&T, &T) -> Ordering,
+{
+    // println!("merge {:?} {:?}", &b[..i], &b[i..]);
+    let mut g = 0;
+    loop {
+        // println!("mergeloop {:?} {:?} {:?}", &b[..g], &b[g..i], &b[i..]);
+        if i - g == 1 {
+            let d = gallop_from_left(&b[g], &b[i..], cmpleftright) + i;
+            let buf = b.as_mut_ptr();
+            let mut tmp = MaybeUninit::<T>::uninit();
+            unsafe {
+                std::ptr::copy_nonoverlapping(buf.offset(g as isize), tmp.as_mut_ptr(), 1);
+                std::ptr::copy(buf.offset(i as isize), buf.offset(g as isize), d - i);
+                std::ptr::copy_nonoverlapping(tmp.as_ptr(), buf.offset(d as isize - 1), 1);
+            }
+            // println!("merged1 {:?}", &b);
+            return d;
+        }
+        if cmpleftright(&b[i - 1], &b[i]) == Ordering::Less {
+            return i;
+        }
+        g += gallop_from_left(&b[i], &b[g..i - 1], cmprightleft);
+        let mut d = i + 1;
+        loop {
+            // println!("childloop {:?} {:?} {:?} {:?}", &b[..g], &b[g..i], &b[i..d], &b[d..]);
+            d += gallop_from_left(&b[g], &b[d..], cmpleftright);
+            if d == b.len() {
+                rotate(&mut b[g..], d - i);
+                // println!("merged {:?}", b);
+                return d;
+            }
+            // println!("before {:?} {:?} {:?} {:?}", &b[..g], &b[g..i], &b[i..d], &b[d..]);
+            if d - i + 1 >= i - g {
+                rotate(&mut b[g..d], d - i);
+                g += d - i + 1;
+                i = d;
+                // println!("after1 {:?} {:?} {:?} {:?}", &b[..g], &b[g..i], &b[i..d], &b[d..]);
+                break;
+            } else {
+                let buf = b.as_mut_ptr();
+                let mut tmp = MaybeUninit::<T>::uninit();
+                let mut j = i;
+                unsafe {
+                    std::ptr::copy_nonoverlapping(buf.offset(g as isize), tmp.as_mut_ptr(), 1);
+                    while j < d {
+                        std::ptr::copy_nonoverlapping(buf.offset(j as isize), buf.offset(g as isize), 1);
+                        g += 1;
+                        std::ptr::copy_nonoverlapping(buf.offset(g as isize), buf.offset(j as isize), 1);
+                        j += 1;
+                    }
+                    std::ptr::copy_nonoverlapping(tmp.as_ptr(), buf.offset(g as isize), 1);
+                }
+                g += 1;
+                // println!("after {:?} {:?} {:?} {:?}", &b[..g], &b[g..i], &b[i..d], &b[d..]);
+                if d < b.len() {
+                    d = merge101(&mut b[i..], d - i, cmpleftright, cmprightleft) + i;
+                }
+            }
+        }
+    }
+}
+
 macro_rules! ascending {
-    ( $comparison:expr ) => ( $comparison != Ordering::Greater )
+    ( $comparison:expr ) => {
+        $comparison != Ordering::Greater
+    };
 }
 
 fn sort4<T, F>(s: &mut [T], compare: &F) -> bool
 where
     T: std::fmt::Debug,
-    F: Fn(&T, &T) -> Ordering
+    F: Fn(&T, &T) -> Ordering,
 {
     // Handcrafted sort for chunks of 4
     //
@@ -657,7 +847,7 @@ where
     if ascending!(compare(&s[0], &s[1])) {
         if ascending!(compare(&s[1], &s[2])) {
             // 1234 1243 1342 2341
-            if ! ascending!(compare(&s[2], &s[3])) {
+            if !ascending!(compare(&s[2], &s[3])) {
                 // 1243 1342 2341
                 if ascending!(compare(&s[0], &s[3])) {
                     // 1243 1342
@@ -681,7 +871,7 @@ where
         } else {
             // 1324 1423 1432 2314
             // 2413 2431 3412 3421
-            if ! ascending!(compare(&s[0], &s[2])) {
+            if !ascending!(compare(&s[0], &s[2])) {
                 //
                 s.swap(0, 2);
             }
@@ -689,7 +879,7 @@ where
             // 1423(2413) 2431(2431) 1432(3412) 2431(3421)
             if ascending!(compare(&s[2], &s[3])) {
                 // 1324(1324) 1423(1423) 1324(2314) 1423(2413)
-                if ! ascending!(compare(&s[1], &s[3])) {
+                if !ascending!(compare(&s[1], &s[3])) {
                     s.swap(1, 3);
                 }
                 // 1324(1324) 1324(1423) 1324(2314) 1324(2413)
@@ -698,7 +888,7 @@ where
                 false
             } else {
                 // 1432(1432) 2431(2431) 1432(3412) 2431(3421)
-                if ! ascending!(compare(&s[0], &s[3])) {
+                if !ascending!(compare(&s[0], &s[3])) {
                     // 2431(2431) 2431(3421)
                     s.swap(0, 3);
                 }
@@ -710,17 +900,17 @@ where
             // 1324 1423 1432 2314 2413 2431 3412 3421 = 5
         }
     } else {
-        if ! ascending!(compare(&s[1], &s[2])) {
+        if !ascending!(compare(&s[1], &s[2])) {
             // 3214 4213 4312 4321
             if ascending!(compare(&s[2], &s[3])) {
                 // 3214 4213 4312
                 s.swap(0, 2);
                 // 1234(3214) 1243(4213) 1342(4312)
-                if ! ascending!(compare(&s[2], &s[3])) {
+                if !ascending!(compare(&s[2], &s[3])) {
                     // 1243(4213) 1342(4312)
                     s.swap(2, 3);
                     // 1234(4213) 1324(4312)
-                    if ! ascending!(compare(&s[1], &s[2])) {
+                    if !ascending!(compare(&s[1], &s[2])) {
                         // 1324(4312)
                         s.swap(1, 2);
                     }
@@ -738,14 +928,14 @@ where
         } else {
             // 2134 2143 3124 3142
             // 3241 4123 4132 4231
-            if ! ascending!(compare(&s[0], &s[2])) {
+            if !ascending!(compare(&s[0], &s[2])) {
                 s.swap(0, 2);
             }
             // 2134(2134) 2143(2143) 2134(3124) 3142(3142)
             // 3241(3241) 2143(4123) 3142(4132) 3241(4231)
             if ascending!(compare(&s[0], &s[3])) {
                 // 2134(2134) 2143(2143) 2134(3124) 2143(4123)
-                if ! ascending!(compare(&s[2], &s[3])) {
+                if !ascending!(compare(&s[2], &s[3])) {
                     // 2143(2143) 2143(4123)
                     s.swap(2, 3);
                 }
@@ -771,29 +961,29 @@ where
 
 fn sort3<T, F>(s: &mut [T], compare: &F)
 where
-    F: Fn(&T, &T) -> Ordering
+    F: Fn(&T, &T) -> Ordering,
 {
     // Handcrafted sort for chunks of 3
     assert!(s.len() == 3);
-    if ! ascending!(compare(&s[0], &s[1])) {
+    if !ascending!(compare(&s[0], &s[1])) {
         s.swap(0, 1);
     }
-    if ! ascending!(compare(&s[1], &s[2])) {
+    if !ascending!(compare(&s[1], &s[2])) {
         if ascending!(compare(&s[0], &s[2])) {
             s.swap(1, 2);
         } else {
-            rotate_right_1(&mut s[.. 3]);
+            rotate_right_1(&mut s[..3]);
         }
     }
 }
 
 fn sort2<T, F>(s: &mut [T], compare: &F)
 where
-    F: Fn(&T, &T) -> Ordering
+    F: Fn(&T, &T) -> Ordering,
 {
     // Handcrafted sort for chunks of 2
     assert!(s.len() == 2);
-    if ! ascending!(compare(&s[0], &s[1])) {
+    if !ascending!(compare(&s[0], &s[1])) {
         s.swap(0, 1);
     }
 }
@@ -802,15 +992,15 @@ fn sort_by_ordering<T, F, G>(s: &mut [T], cmpleftright: &F, cmprightleft: &G, re
 where
     T: std::fmt::Debug,
     F: Fn(&T, &T) -> Ordering,
-    G: Fn(&T, &T) -> Ordering
+    G: Fn(&T, &T) -> Ordering,
 {
     let end = s.len();
     let rump = end % 4;
     let mut start = end - rump;
     match rump {
         0 | 1 => (),
-        2 => sort2(&mut s[start ..], cmpleftright),
-        3 => sort3(&mut s[start ..], cmpleftright),
+        2 => sort2(&mut s[start..], cmpleftright),
+        3 => sort3(&mut s[start..], cmpleftright),
         _ => unreachable!(),
     }
 
@@ -867,11 +1057,16 @@ where
     while start > 0 {
         let mut end = start;
         start -= 4;
-        sort4(&mut s[start .. end], cmpleftright);
+        sort4(&mut s[start..end], cmpleftright);
         let mut size = 4usize;
         while start & size == 0 && end < s.len() {
             end = min(end + size, s.len());
-            merge_inplace(&mut s[start .. end], size, cmpleftright, cmprightleft, recurse);
+            merge(
+                &mut s[start..end],
+                size,
+                cmpleftright,
+                cmprightleft,
+            );
             size *= 2;
         }
     }
@@ -880,19 +1075,19 @@ where
 pub fn sort_by<T, F>(s: &mut [T], compare: &F)
 where
     T: std::fmt::Debug,
-    F: Fn(&T, &T) -> Ordering
+    F: Fn(&T, &T) -> Ordering,
 {
     sort_by_ordering(
         s,
-        &|ref a, ref b|{compare(&a, &b).then(Ordering::Less)},
-        &|ref a, ref b|{compare(&a, &b).then(Ordering::Greater)},
-        RECURSION_LIMIT
+        &|ref a, ref b| compare(&a, &b).then(Ordering::Less),
+        &|ref a, ref b| compare(&a, &b).then(Ordering::Greater),
+        RECURSION_LIMIT,
     )
 }
 
 pub fn sort<T>(s: &mut [T])
 where
-    T: Ord + std::fmt::Debug
+    T: Ord + std::fmt::Debug,
 {
     sort_by(s, &T::cmp);
 }
@@ -903,7 +1098,7 @@ mod tests {
     use std::cmp::Ordering;
 
     // A non-copy but comparable type is useful for testing, as bad moves are hidden by Copy types.
-    #[derive(PartialEq,Eq,PartialOrd,Ord,Debug)]
+    #[derive(PartialEq, Eq, PartialOrd, Ord, Debug)]
     struct Nc(i32);
 
     #[test]
@@ -960,7 +1155,10 @@ mod tests {
     fn sort_ordered() {
         let mut s = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
         let count = Cell::new(0);
-        super::sort_by(&mut s, &|a: &usize, b: &usize|{count.set(count.get() + 1); a.cmp(&b)});
+        super::sort_by(&mut s, &|a: &usize, b: &usize| {
+            count.set(count.get() + 1);
+            a.cmp(&b)
+        });
         for (i, elem) in s.iter().enumerate() {
             assert_eq!(*elem, i);
         }
@@ -1001,8 +1199,11 @@ mod tests {
     fn merge_0() {
         let mut s: [i32; 0] = [];
         let count = Cell::new(0);
-        let compare = |a: &i32, b: &i32|{count.set(count.get() + 1); i32::cmp(&a, &b)};
-        super::merge_inplace(&mut s, 0, &compare, &compare, super::MAX_RECURSION_LIMIT);
+        let compare = |a: &i32, b: &i32| {
+            count.set(count.get() + 1);
+            i32::cmp(&a, &b)
+        };
+        super::merge(&mut s, 0, &compare, &compare);
         assert_eq!(count.get(), 0);
     }
 
@@ -1010,8 +1211,11 @@ mod tests {
     fn merge_0_1() {
         let mut s = [1];
         let count = Cell::new(0);
-        let compare = |a: &i32, b: &i32|{count.set(count.get() + 1); i32::cmp(&a, &b)};
-        super::merge_inplace(&mut s, 0, &compare, &compare, super::MAX_RECURSION_LIMIT);
+        let compare = |a: &i32, b: &i32| {
+            count.set(count.get() + 1);
+            i32::cmp(&a, &b)
+        };
+        super::merge(&mut s, 0, &compare, &compare);
         assert_eq!(count.get(), 0);
         assert_eq!(s[0], 1);
     }
@@ -1020,8 +1224,11 @@ mod tests {
     fn merge_1_0() {
         let mut s = [1];
         let count = Cell::new(0);
-        let compare = |a: &i32, b: &i32|{count.set(count.get() + 1); i32::cmp(&a, &b)};
-        super::merge_inplace(&mut s, 1, &compare, &compare, super::MAX_RECURSION_LIMIT);
+        let compare = |a: &i32, b: &i32| {
+            count.set(count.get() + 1);
+            i32::cmp(&a, &b)
+        };
+        super::merge(&mut s, 1, &compare, &compare);
         assert_eq!(count.get(), 0);
         assert_eq!(s[0], 1);
     }
@@ -1030,8 +1237,11 @@ mod tests {
     fn merge_1_1_ordered() {
         let mut s = [1, 2];
         let count = Cell::new(0);
-        let compare = |a: &i32, b: &i32|{count.set(count.get() + 1); i32::cmp(&a, &b)};
-        super::merge_inplace(&mut s, 1, &compare, &compare, super::MAX_RECURSION_LIMIT);
+        let compare = |a: &i32, b: &i32| {
+            count.set(count.get() + 1);
+            i32::cmp(&a, &b)
+        };
+        super::merge(&mut s, 1, &compare, &compare);
         assert_eq!(count.get(), 1);
         assert_eq!(s[0], 1);
         assert_eq!(s[1], 2);
@@ -1041,8 +1251,11 @@ mod tests {
     fn merge_1_1_unordered() {
         let mut s = [2, 1];
         let count = Cell::new(0);
-        let compare = |a: &i32, b: &i32|{count.set(count.get() + 1); i32::cmp(&a, &b)};
-        super::merge_inplace(&mut s, 1, &compare, &compare, super::MAX_RECURSION_LIMIT);
+        let compare = |a: &i32, b: &i32| {
+            count.set(count.get() + 1);
+            i32::cmp(&a, &b)
+        };
+        super::merge(&mut s, 1, &compare, &compare);
         // One compare required, but there are 2 debug_assert that compare
         assert!(count.get() <= 3);
         assert_eq!(s[0], 1);
@@ -1053,8 +1266,11 @@ mod tests {
     fn merge_1_n() {
         let mut s = [7, 0, 1, 2, 3, 4, 5, 6, 8, 9, 10];
         let count = Cell::new(0);
-        let compare = |a: &usize, b: &usize|{count.set(count.get() + 1); usize::cmp(&a, &b)};
-        super::merge_inplace(&mut s, 1, &compare, &compare, super::MAX_RECURSION_LIMIT);
+        let compare = |a: &usize, b: &usize| {
+            count.set(count.get() + 1);
+            usize::cmp(&a, &b)
+        };
+        super::merge(&mut s, 1, &compare, &compare);
         // assert_eq!(count.get(), 4);
         for (i, elem) in s.iter().enumerate() {
             assert_eq!(*elem, i);
@@ -1066,8 +1282,16 @@ mod tests {
         let mut s = [0, 1, 2, 3, 4, 5, 6, 8, 9, 10, 7];
         let count = Cell::new(0);
         let leftlen = s.len() - 1;
-        let compare = |a: &usize, b: &usize|{count.set(count.get() + 1); usize::cmp(&a, &b)};
-        super::merge_inplace(&mut s, leftlen, &compare, &compare, super::MAX_RECURSION_LIMIT);
+        let compare = |a: &usize, b: &usize| {
+            count.set(count.get() + 1);
+            usize::cmp(&a, &b)
+        };
+        super::merge(
+            &mut s,
+            leftlen,
+            &compare,
+            &compare,
+        );
         // assert_eq!(count.get(), 5);
         for (i, elem) in s.iter().enumerate() {
             assert_eq!(*elem, i);
@@ -1079,8 +1303,16 @@ mod tests {
         let mut s = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
         let count = Cell::new(0);
         let leftlen = s.len() / 2;
-        let compare = |a: &usize, b: &usize|{count.set(count.get() + 1); usize::cmp(&a, &b)};
-        super::merge_inplace(&mut s, leftlen, &compare, &compare, super::MAX_RECURSION_LIMIT);
+        let compare = |a: &usize, b: &usize| {
+            count.set(count.get() + 1);
+            usize::cmp(&a, &b)
+        };
+        super::merge(
+            &mut s,
+            leftlen,
+            &compare,
+            &compare,
+        );
         assert_eq!(count.get(), 1);
         for (i, elem) in s.iter().enumerate() {
             assert_eq!(*elem, i);
@@ -1089,13 +1321,13 @@ mod tests {
 
     #[test]
     fn merge_left_alternative() {
-        let mut s = [
-            2, 4, 6, 8, 10, 12, 14, 16,
-            1, 3, 5, 7, 9, 11, 13, 15,
-        ];
+        let mut s = [2, 4, 6, 8, 10, 12, 14, 16, 1, 3, 5, 7, 9, 11, 13, 15];
         let count = Cell::new(0);
         let leftlen = s.len() / 2;
-        let compare = |a: &usize, b: &usize|{count.set(count.get() + 1); usize::cmp(&a, &b)};
+        let compare = |a: &usize, b: &usize| {
+            count.set(count.get() + 1);
+            usize::cmp(&a, &b)
+        };
         super::merge_left(&mut s, leftlen, &compare, &compare);
         assert_eq!(count.get(), 26);
         for (i, elem) in s.iter().enumerate() {
@@ -1105,13 +1337,13 @@ mod tests {
 
     #[test]
     fn merge_right_alternative() {
-        let mut s = [
-            2, 4, 6, 8, 10, 12, 14, 16,
-            1, 3, 5, 7, 9, 11, 13, 15,
-        ];
+        let mut s = [2, 4, 6, 8, 10, 12, 14, 16, 1, 3, 5, 7, 9, 11, 13, 15];
         let count = Cell::new(0);
         let leftlen = s.len() / 2;
-        let compare = |a: &usize, b: &usize|{count.set(count.get() + 1); usize::cmp(&a, &b)};
+        let compare = |a: &usize, b: &usize| {
+            count.set(count.get() + 1);
+            usize::cmp(&a, &b)
+        };
         super::merge_right(&mut s, leftlen, &compare, &compare);
         assert_eq!(count.get(), 24);
         for (i, elem) in s.iter().enumerate() {
@@ -1121,14 +1353,20 @@ mod tests {
 
     #[test]
     fn merge_recurse_alternative() {
-        let mut s = [
-            2, 4, 6, 8, 10, 12, 14, 16,
-            1, 3, 5, 7, 9, 11, 13, 15,
-        ];
+        let mut s = [2, 4, 6, 8, 10, 12, 14, 16, 1, 3, 5, 7, 9, 11, 13, 15];
         let count = Cell::new(0);
         let leftlen = s.len() / 2;
-        let compare = |a: &usize, b: &usize|{count.set(count.get() + 1); usize::cmp(&a, &b)};
-        super::merge_recurse(&mut s, leftlen, &compare, &compare, super::MAX_RECURSION_LIMIT);
+        let compare = |a: &usize, b: &usize| {
+            count.set(count.get() + 1);
+            usize::cmp(&a, &b)
+        };
+        super::merge_recurse(
+            &mut s,
+            leftlen,
+            &compare,
+            &compare,
+            super::MAX_RECURSION_LIMIT,
+        );
         assert_eq!(count.get(), 26);
         for (i, elem) in s.iter().enumerate() {
             assert_eq!(*elem, i + 1);
@@ -1137,13 +1375,13 @@ mod tests {
 
     #[test]
     fn merge_final_alternative() {
-        let mut s = [
-            2, 4, 6, 8, 10, 12, 14, 16,
-            1, 3, 5, 7, 9, 11, 13, 15,
-        ];
+        let mut s = [2, 4, 6, 8, 10, 12, 14, 16, 1, 3, 5, 7, 9, 11, 13, 15];
         let count = Cell::new(0);
         let leftlen = s.len() / 2;
-        let compare = |a: &usize, b: &usize|{count.set(count.get() + 1); usize::cmp(&a, &b)};
+        let compare = |a: &usize, b: &usize| {
+            count.set(count.get() + 1);
+            usize::cmp(&a, &b)
+        };
         super::merge_final(&mut s, leftlen, &compare, &compare);
         assert_eq!(count.get(), 26);
         for (i, elem) in s.iter().enumerate() {
@@ -1153,98 +1391,157 @@ mod tests {
 
     #[test]
     fn gallop_right_0() {
-        assert_eq!(super::gallop_right(&Nc(3), &[], &Nc::cmp), 0)
+        assert_eq!(super::gallop_from_left(&Nc(3), &[], &Nc::cmp), 0)
     }
 
     #[test]
     fn gallop_right_1_before() {
-        assert_eq!(super::gallop_right(&Nc(1), &[Nc(2)], &Nc::cmp), 0)
+        assert_eq!(super::gallop_from_left(&Nc(1), &[Nc(2)], &Nc::cmp), 0)
     }
     #[test]
     fn gallop_right_1_after() {
-        assert_eq!(super::gallop_right(&Nc(3), &[Nc(2)], &Nc::cmp), 1)
+        assert_eq!(super::gallop_from_left(&Nc(3), &[Nc(2)], &Nc::cmp), 1)
     }
 
     #[test]
     fn gallop_right_2_before() {
-        assert_eq!(super::gallop_right(&Nc(1), &[Nc(2), Nc(4)], &Nc::cmp), 0)
+        assert_eq!(
+            super::gallop_from_left(&Nc(1), &[Nc(2), Nc(4)], &Nc::cmp),
+            0
+        )
     }
     #[test]
     fn gallop_right_2_middle() {
-        assert_eq!(super::gallop_right(&Nc(3), &[Nc(2), Nc(4)], &Nc::cmp), 1)
+        assert_eq!(
+            super::gallop_from_left(&Nc(3), &[Nc(2), Nc(4)], &Nc::cmp),
+            1
+        )
     }
     #[test]
     fn gallop_right_2_after() {
-        assert_eq!(super::gallop_right(&Nc(5), &[Nc(2), Nc(4)], &Nc::cmp), 2)
+        assert_eq!(
+            super::gallop_from_left(&Nc(5), &[Nc(2), Nc(4)], &Nc::cmp),
+            2
+        )
     }
 
     #[test]
     fn gallop_right_3_before() {
-        assert_eq!(super::gallop_right(&Nc(1), &[Nc(2), Nc(4), Nc(6)], &Nc::cmp), 0)
+        assert_eq!(
+            super::gallop_from_left(&Nc(1), &[Nc(2), Nc(4), Nc(6)], &Nc::cmp),
+            0
+        )
     }
     #[test]
     fn gallop_right_3_lt() {
         // Default to Ordering::Less if the value should be inserted before equal values
-        let compare = |a: &Nc, b: &Nc|{Nc::cmp(&a, &b).then(Ordering::Less)};
-        assert_eq!(super::gallop_right(&Nc(4), &[Nc(2), Nc(4), Nc(6)], &compare), 1)
+        let compare = |a: &Nc, b: &Nc| Nc::cmp(&a, &b).then(Ordering::Less);
+        assert_eq!(
+            super::gallop_from_left(&Nc(4), &[Nc(2), Nc(4), Nc(6)], &compare),
+            1
+        )
     }
     #[test]
     fn gallop_right_3_le() {
         // Default to Ordering::Greater if value should be inserted after equal values
-        let compare = |a: &Nc, b: &Nc|{Nc::cmp(&a, &b).then(Ordering::Greater)};
-        assert_eq!(super::gallop_right(&Nc(4), &[Nc(2), Nc(4), Nc(6)], &compare), 2)
+        let compare = |a: &Nc, b: &Nc| Nc::cmp(&a, &b).then(Ordering::Greater);
+        assert_eq!(
+            super::gallop_from_left(&Nc(4), &[Nc(2), Nc(4), Nc(6)], &compare),
+            2
+        )
     }
     #[test]
     fn gallop_right_3_after() {
-        assert_eq!(super::gallop_right(&Nc(7), &[Nc(2), Nc(4), Nc(6)], &Nc::cmp), 3)
+        assert_eq!(
+            super::gallop_from_left(&Nc(7), &[Nc(2), Nc(4), Nc(6)], &Nc::cmp),
+            3
+        )
     }
 
     #[test]
     fn gallop_right_2powm1() {
         let s = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14];
         let mut profile = Vec::new();
-        for v in 0 .. s.len() + 1 {
+        for v in 0..s.len() + 1 {
             let count = Cell::new(0);
-            assert_eq!(super::gallop_right(&v, &s, &|&a, &b|{count.set(count.get() + 1); usize::cmp(&a, &b).then(Ordering::Less)}), v);
+            assert_eq!(
+                super::gallop_from_left(&v, &s, &|&a, &b| {
+                    count.set(count.get() + 1);
+                    usize::cmp(&a, &b).then(Ordering::Less)
+                }),
+                v
+            );
             profile.push(count.get());
         }
-        assert_eq!(profile, vec![2, 2, 3, 3, 5, 5, 5, 5, 6, 6, 6, 6, 6, 6, 6, 6])
+        assert_eq!(
+            profile,
+            vec![2, 2, 3, 3, 5, 5, 5, 5, 6, 6, 6, 6, 6, 6, 6, 6]
+        )
     }
 
     #[test]
     fn gallop_right_2pow() {
         let s = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
         let mut profile = Vec::new();
-        for v in 0 .. s.len() + 1 {
+        for v in 0..s.len() + 1 {
             let count = Cell::new(0);
-            assert_eq!(super::gallop_right(&v, &s, &|&a, &b|{count.set(count.get() + 1); usize::cmp(&a, &b).then(Ordering::Less)}), v);
+            assert_eq!(
+                super::gallop_from_left(&v, &s, &|&a, &b| {
+                    count.set(count.get() + 1);
+                    usize::cmp(&a, &b).then(Ordering::Less)
+                }),
+                v
+            );
             profile.push(count.get());
         }
-        assert_eq!(profile, vec![2, 2, 3, 3, 5, 5, 5, 5, 7, 7, 7, 7, 7, 7, 7, 7, 4])
+        assert_eq!(
+            profile,
+            vec![2, 2, 3, 3, 5, 5, 5, 5, 7, 7, 7, 7, 7, 7, 7, 7, 4]
+        )
     }
 
     #[test]
     fn gallop_right_2powp1() {
         let s = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16];
         let mut profile = Vec::new();
-        for v in 0 .. s.len() + 1 {
+        for v in 0..s.len() + 1 {
             let count = Cell::new(0);
-            assert_eq!(super::gallop_right(&v, &s, &|&a, &b|{count.set(count.get() + 1); usize::cmp(&a, &b).then(Ordering::Less)}), v);
+            assert_eq!(
+                super::gallop_from_left(&v, &s, &|&a, &b| {
+                    count.set(count.get() + 1);
+                    usize::cmp(&a, &b).then(Ordering::Less)
+                }),
+                v
+            );
             profile.push(count.get());
         }
-        assert_eq!(profile, vec![2, 2, 3, 3, 5, 5, 5, 5, 7, 7, 7, 7, 7, 7, 7, 7, 5, 5])
+        assert_eq!(
+            profile,
+            vec![2, 2, 3, 3, 5, 5, 5, 5, 7, 7, 7, 7, 7, 7, 7, 7, 5, 5]
+        )
     }
 
     #[test]
     fn gallop_right_20() {
-        let s = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19];
+        let s = [
+            0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19,
+        ];
         let mut profile = Vec::new();
-        for v in 0 .. s.len() + 1 {
+        for v in 0..s.len() + 1 {
             let count = Cell::new(0);
-            assert_eq!(super::gallop_right(&v, &s, &|&a, &b|{count.set(count.get() + 1); usize::cmp(&a, &b).then(Ordering::Less)}), v);
+            assert_eq!(
+                super::gallop_from_left(&v, &s, &|&a, &b| {
+                    count.set(count.get() + 1);
+                    usize::cmp(&a, &b).then(Ordering::Less)
+                }),
+                v
+            );
             profile.push(count.get());
         }
-        assert_eq!(profile, vec![2, 2, 3, 3, 5, 5, 5, 5, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 6, 6, 6])
+        assert_eq!(
+            profile,
+            vec![2, 2, 3, 3, 5, 5, 5, 5, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 6, 6, 6]
+        )
     }
 
     #[test]
@@ -1276,71 +1573,121 @@ mod tests {
 
     #[test]
     fn gallop_left_3_before() {
-        assert_eq!(super::gallop_left(&Nc(1), &[Nc(2), Nc(4), Nc(6)], &Nc::cmp), 0)
+        assert_eq!(
+            super::gallop_left(&Nc(1), &[Nc(2), Nc(4), Nc(6)], &Nc::cmp),
+            0
+        )
     }
     #[test]
     fn gallop_left_3_lt() {
         // Default to Ordering::Less if the value should be inserted before equal values
-        let compare = |a: &Nc, b: &Nc|{Nc::cmp(&a, &b).then(Ordering::Less)};
-        assert_eq!(super::gallop_left(&Nc(4), &[Nc(2), Nc(4), Nc(6)], &compare), 1)
+        let compare = |a: &Nc, b: &Nc| Nc::cmp(&a, &b).then(Ordering::Less);
+        assert_eq!(
+            super::gallop_left(&Nc(4), &[Nc(2), Nc(4), Nc(6)], &compare),
+            1
+        )
     }
     #[test]
     fn gallop_left_3_le() {
         // Default to Ordering::Greater if value should be inserted after equal values
-        let compare = |a: &Nc, b: &Nc|{Nc::cmp(&a, &b).then(Ordering::Greater)};
-        assert_eq!(super::gallop_left(&Nc(4), &[Nc(2), Nc(4), Nc(6)], &compare), 2)
+        let compare = |a: &Nc, b: &Nc| Nc::cmp(&a, &b).then(Ordering::Greater);
+        assert_eq!(
+            super::gallop_left(&Nc(4), &[Nc(2), Nc(4), Nc(6)], &compare),
+            2
+        )
     }
     #[test]
     fn gallop_left_3_after() {
-        assert_eq!(super::gallop_left(&Nc(7), &[Nc(2), Nc(4), Nc(6)], &Nc::cmp), 3)
+        assert_eq!(
+            super::gallop_left(&Nc(7), &[Nc(2), Nc(4), Nc(6)], &Nc::cmp),
+            3
+        )
     }
 
     #[test]
     fn gallop_left_2powm1() {
         let s = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14];
         let mut profile = Vec::new();
-        for v in 0 .. s.len() + 1 {
+        for v in 0..s.len() + 1 {
             let count = Cell::new(0);
-            assert_eq!(super::gallop_left(&v, &s, &|&a, &b|{count.set(count.get() + 1); usize::cmp(&a, &b).then(Ordering::Less)}), v);
+            assert_eq!(
+                super::gallop_left(&v, &s, &|&a, &b| {
+                    count.set(count.get() + 1);
+                    usize::cmp(&a, &b).then(Ordering::Less)
+                }),
+                v
+            );
             profile.push(count.get());
         }
-        assert_eq!(profile, vec![6, 6, 6, 6, 6, 6, 6, 6, 5, 5, 5, 5, 3, 3, 2, 2])
+        assert_eq!(
+            profile,
+            vec![6, 6, 6, 6, 6, 6, 6, 6, 5, 5, 5, 5, 3, 3, 2, 2]
+        )
     }
 
     #[test]
     fn gallop_left_2pow() {
         let s = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
         let mut profile = Vec::new();
-        for v in 0 .. s.len() + 1 {
+        for v in 0..s.len() + 1 {
             let count = Cell::new(0);
-            assert_eq!(super::gallop_left(&v, &s, &|&a, &b|{count.set(count.get() + 1); usize::cmp(&a, &b).then(Ordering::Less)}), v);
+            assert_eq!(
+                super::gallop_left(&v, &s, &|&a, &b| {
+                    count.set(count.get() + 1);
+                    usize::cmp(&a, &b).then(Ordering::Less)
+                }),
+                v
+            );
             profile.push(count.get());
         }
-        assert_eq!(profile, vec![7, 7, 6, 6, 6, 6, 6, 6, 6, 5, 5, 5, 5, 3, 3, 2, 2])
+        assert_eq!(
+            profile,
+            vec![7, 7, 6, 6, 6, 6, 6, 6, 6, 5, 5, 5, 5, 3, 3, 2, 2]
+        )
     }
 
     #[test]
     fn gallop_left_2powp1() {
         let s = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16];
         let mut profile = Vec::new();
-        for v in 0 .. s.len() + 1 {
+        for v in 0..s.len() + 1 {
             let count = Cell::new(0);
-            assert_eq!(super::gallop_left(&v, &s, &|&a, &b|{count.set(count.get() + 1); usize::cmp(&a, &b).then(Ordering::Less)}), v);
+            assert_eq!(
+                super::gallop_left(&v, &s, &|&a, &b| {
+                    count.set(count.get() + 1);
+                    usize::cmp(&a, &b).then(Ordering::Less)
+                }),
+                v
+            );
             profile.push(count.get());
         }
-        assert_eq!(profile, vec![5, 5, 7, 7, 7, 7, 7, 7, 7, 7, 5, 5, 5, 5, 3, 3, 2, 2])
+        assert_eq!(
+            profile,
+            vec![5, 5, 7, 7, 7, 7, 7, 7, 7, 7, 5, 5, 5, 5, 3, 3, 2, 2]
+        )
     }
 
     #[test]
     fn gallop_left_20() {
-        let s = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19];
+        let s = [
+            0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19,
+        ];
         let mut profile = Vec::new();
-        for v in 0 .. s.len() + 1 {
+        for v in 0..s.len() + 1 {
             let count = Cell::new(0);
-            assert_eq!(super::gallop_left(&v, &s, &|&a, &b|{count.set(count.get() + 1); usize::cmp(&a, &b).then(Ordering::Less)}), v);
+            assert_eq!(
+                super::gallop_left(&v, &s, &|&a, &b| {
+                    count.set(count.get() + 1);
+                    usize::cmp(&a, &b).then(Ordering::Less)
+                }),
+                v
+            );
             profile.push(count.get());
         }
-        assert_eq!(profile, vec![7, 7, 6, 6, 6, 7, 7, 7, 7, 7, 7, 7, 7, 5, 5, 5, 5, 3, 3, 2, 2])
+        assert_eq!(
+            profile,
+            vec![7, 7, 6, 6, 6, 7, 7, 7, 7, 7, 7, 7, 7, 5, 5, 5, 5, 3, 3, 2, 2]
+        )
     }
 
     #[test]
@@ -1359,55 +1706,88 @@ mod tests {
 
     #[test]
     fn binary_search_2_before() {
-        assert_eq!(super::binary_search(&Nc(1), &[Nc(2), Nc(4)], 0, &Nc::cmp), 0)
+        assert_eq!(
+            super::binary_search(&Nc(1), &[Nc(2), Nc(4)], 0, &Nc::cmp),
+            0
+        )
     }
     #[test]
     fn binary_search_2_middle() {
-        assert_eq!(super::binary_search(&Nc(3), &[Nc(2), Nc(4)], 0, &Nc::cmp), 1)
+        assert_eq!(
+            super::binary_search(&Nc(3), &[Nc(2), Nc(4)], 0, &Nc::cmp),
+            1
+        )
     }
     #[test]
     fn binary_search_2_after() {
-        assert_eq!(super::binary_search(&Nc(5), &[Nc(2), Nc(4)], 0, &Nc::cmp), 2)
+        assert_eq!(
+            super::binary_search(&Nc(5), &[Nc(2), Nc(4)], 0, &Nc::cmp),
+            2
+        )
     }
 
     #[test]
     fn binary_search_3_before() {
-        assert_eq!(super::binary_search(&Nc(1), &[Nc(2), Nc(4), Nc(6)], 0, &Nc::cmp), 0)
+        assert_eq!(
+            super::binary_search(&Nc(1), &[Nc(2), Nc(4), Nc(6)], 0, &Nc::cmp),
+            0
+        )
     }
     #[test]
     fn binary_search_3_lt() {
         // Default to Ordering::Less if the value should be inserted before equal values
-        let compare = |a: &Nc, b: &Nc|{Nc::cmp(&a, &b).then(Ordering::Less)};
-        assert_eq!(super::binary_search(&Nc(4), &[Nc(2), Nc(4), Nc(6)], 0, &compare), 1)
+        let compare = |a: &Nc, b: &Nc| Nc::cmp(&a, &b).then(Ordering::Less);
+        assert_eq!(
+            super::binary_search(&Nc(4), &[Nc(2), Nc(4), Nc(6)], 0, &compare),
+            1
+        )
     }
     #[test]
     fn binary_search_3_le() {
         // Default to Ordering::Greater if value should be inserted after equal values
-        let compare = |a: &Nc, b: &Nc|{Nc::cmp(&a, &b).then(Ordering::Greater)};
-        assert_eq!(super::binary_search(&Nc(4), &[Nc(2), Nc(4), Nc(6)], 0, &compare), 2)
+        let compare = |a: &Nc, b: &Nc| Nc::cmp(&a, &b).then(Ordering::Greater);
+        assert_eq!(
+            super::binary_search(&Nc(4), &[Nc(2), Nc(4), Nc(6)], 0, &compare),
+            2
+        )
     }
     #[test]
     fn binary_search_3_after() {
-        assert_eq!(super::binary_search(&Nc(7), &[Nc(2), Nc(4), Nc(6)], 0, &Nc::cmp), 3)
+        assert_eq!(
+            super::binary_search(&Nc(7), &[Nc(2), Nc(4), Nc(6)], 0, &Nc::cmp),
+            3
+        )
     }
 
     #[test]
     fn binary_search_2powm1() {
         let s = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14];
         let mut profile = Vec::new();
-        for v in 0 .. s.len() + 1 {
+        for v in 0..s.len() + 1 {
             let count = Cell::new(0);
-            assert_eq!(super::binary_search(&v, &s, 0, &|&a, &b|{count.set(count.get() + 1); usize::cmp(&a, &b).then(Ordering::Less)}), v);
+            assert_eq!(
+                super::binary_search(&v, &s, 0, &|&a, &b| {
+                    count.set(count.get() + 1);
+                    usize::cmp(&a, &b).then(Ordering::Less)
+                }),
+                v
+            );
             profile.push(count.get());
         }
-        assert_eq!(profile, vec![4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4])
+        assert_eq!(
+            profile,
+            vec![4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4]
+        )
     }
 
     #[test]
     fn binary_search_stable() {
         let s = [1, 5, 5, 5, 5, 5, 8];
         let count = Cell::new(0);
-        super::binary_search(&5, &s, 0, &|&a, &b|{count.set(count.get() + 1); i32::cmp(&a, &b).then(Ordering::Less)});
+        super::binary_search(&5, &s, 0, &|&a, &b| {
+            count.set(count.get() + 1);
+            i32::cmp(&a, &b).then(Ordering::Less)
+        });
         assert_eq!(count.get(), 3);
     }
 
@@ -1417,7 +1797,10 @@ mod tests {
         // Since first comparsion finds matching value, it will return immediately.
         let s = [1, 5, 5, 5, 5, 5, 8];
         let count = Cell::new(0);
-        super::binary_search(&5, &s, 0, &|&a, &b|{count.set(count.get() + 1); i32::cmp(&a, &b)});
+        super::binary_search(&5, &s, 0, &|&a, &b| {
+            count.set(count.get() + 1);
+            i32::cmp(&a, &b)
+        });
         assert_eq!(count.get(), 1);
     }
 
@@ -1483,9 +1866,14 @@ mod tests {
 
     #[test]
     fn rotate_gcd_3() {
-        let mut buf = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21];
+        let mut buf = [
+            1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21,
+        ];
         super::rotate(&mut buf, 6);
-        assert_eq!(buf, [16, 17, 18, 19, 20, 21, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]);
+        assert_eq!(
+            buf,
+            [16, 17, 18, 19, 20, 21, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
+        );
     }
 
     quickcheck! {
@@ -1528,7 +1916,7 @@ mod tests {
 
     fn gen_random(len: usize) -> Vec<u64> {
         let mut rng = thread_rng();
-        rng.gen_iter::<u64>().take(len).collect()
+        rng.gen_iter::<u64>().map(|x|x%256).take(len).collect()
     }
 
     fn gen_mostly_ascending(len: usize) -> Vec<u64> {
@@ -1559,7 +1947,7 @@ mod tests {
         let mut v = gen_ascending(len);
         let last = v.len() - 1;
         v.swap(0, last);
-        for i in 1 .. last {
+        for i in 1..last {
             if i % 2 == 0 {
                 v.swap(i - 1, i);
             }
@@ -1571,10 +1959,10 @@ mod tests {
         let mut left = Vec::<u64>::new();
         let mut right = Vec::<u64>::new();
         let mut val = 0;
-        for i in 2 .. 513 {
+        for i in 2..513 {
             right.push(val);
             val += 1;
-            for _ in 0 .. i {
+            for _ in 0..i {
                 left.push(val);
                 val += 1;
             }
@@ -1587,10 +1975,10 @@ mod tests {
         let mut left = Vec::<u64>::new();
         let mut right = Vec::<u64>::new();
         let mut val = 0;
-        for i in 2 .. 513 {
+        for i in 2..513 {
             right.push(val);
             val += 1;
-            for _ in 0 .. i {
+            for _ in 0..i {
                 left.push(val);
                 val += 1;
             }
@@ -1618,9 +2006,9 @@ mod tests {
             fn $name() {
                 let mut s = $gen($len);
                 super::sort(&mut s);
-                assert!(s.windows(2).all(|v| v[0] <= v[1]));
+                assert!(s.windows(2).all(|v| v[0] <= v[1]), "{:?}", s);
             }
-        }
+        };
     }
 
     bench_test!(small_random_bench_test, gen_random, 10);
@@ -1639,8 +2027,16 @@ mod tests {
     bench_test!(large_random_bench_test, gen_random, 10000);
     bench_test!(large_ascending_bench_test, gen_ascending, 10000);
     bench_test!(large_descending_bench_test, gen_descending, 10000);
-    bench_test!(large_mostly_ascending_bench_test, gen_mostly_ascending, 10000);
-    bench_test!(large_mostly_descending_bench_test, gen_mostly_descending, 10000);
+    bench_test!(
+        large_mostly_ascending_bench_test,
+        gen_mostly_ascending,
+        10000
+    );
+    bench_test!(
+        large_mostly_descending_bench_test,
+        gen_mostly_descending,
+        10000
+    );
 
     bench_test!(nightmare_bench_test, gen_nightmare, 1);
     bench_test!(marenight_bench_test, gen_marenight, 1);
@@ -1648,5 +2044,4 @@ mod tests {
     bench_test!(large_big_random_bench_test, gen_big_random, 10000);
     bench_test!(large_big_ascending_bench_test, gen_big_ascending, 10000);
     bench_test!(large_big_descending_bench_test, gen_big_descending, 10000);
-
 }
