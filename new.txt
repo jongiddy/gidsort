@@ -1,41 +1,95 @@
-fn get_insert_pos(needle: &T, haystack: &[T])
-  gallop right from position 1
-}
-
 fn merge(mut b: &mut[T], mut i: usize) -> usize
--- assert 0 < i < b.len() -- both sizes have non-zero length
--- returns the position after the final position of Lmax
-// i == 1 only happens on a sub-merge (called from child)
-// in that case, we know we're not dealing with already sorted
-// data, so we can afford to perform a gallop starting at 1
-// without checking for already-sorted.
-if i == 1 {
-  let k = gallop_from_left(&b[0], &b[1..]) + 1;
-  let tmp = b[0];
-  move b[1..k] to b[0..k-1]
-  b[k-1] = tmp;
-  return k;
-}
-if &b[i - 1] < &b[i] {
-  // make already sorted only require one comparison
-  return i;
-}
-// assert i > 1
-// Get insertion position of R0 in L
-// We know k < i, since we checked above for already sorted.
-// We assume random data so gallop from the left
-let k = gallop_from_left(&b[i], &b[..i - 1]);
-// Everything before k is sorted and no longer needs to be considered.
-// Everything after k is > R0
-// we only know that the first value in R is < L0
-return child(&mut b, k, i, i + 1)
+  -- b[..i] is sorted, b[i..] is sorted
+  // returns the position after the final position of Lmax (b.len() if i == 0)
+  if i == 0 || i = b.len() {
+    return b.len()
+  }
+  -- 0 < i < b.len()
+  merge101(b, i)
+
+fn merge101(mut b: &mut[T], mut i: usize) -> usize
+  -- b[..i] is sorted, b[i..] is sorted
+  -- 0 < i < b.len()
+  // returns the position after the final position of Lmax
+  let mut g = 0;
+  loop {
+    -- 0 <= g < i < b.len()
+    if i - g == 1 {
+      // g X i MNOYZ
+      let d = gallop_from_left(&b[g], &b[i..], <) + i;
+      // g X i MNO d YZ
+      let tmp = b[g];
+      let ptr = b.as_mut_ptr();
+      unsafe { std::ptr::copy(ptr.offset(i), ptr.offset(g), d - 1); }
+      b[d - 1] = tmp;
+      // g M i NOX d YZ
+      return d;
+    }
+    -- 0 <= g, g + 1 < i < b.len()
+    if &b[i - 1] < &b[i] {
+      // make already sorted only require one comparison
+      return i;
+    }
+    // Get insertion position g of R0 in L
+    // We know g < i, since we checked above for already sorted.
+    // We assume random data (50% chance of L or R being first) so gallop from the left
+    g += gallop_from_left(&b[i], &b[g..i - 1], >);
+    // Everything before g is sorted and no longer needs to be considered.
+    // Everything after g is > R0
+    // we only know that the first value in R is < L0
+    -- g is start of L, i is start of R
+    -- assert g < i < b.len() -- both sizes have non-zero length
+    -- i < d <= b.len() is the index where all RHS elements before it are *known* to be < L0 (i.e. there may be later values < L0)
+    -- returns the position after the final position of Lmax + acc
+    let mut d = i + 1;
+    loop {
+      d += gallop_from_left(&b[g], &b[d..], <); // d is now the index where all b[i..d] are < b[g]
+      if i - g < d - i {
+        // ABCD g SUV i EM d RZ
+        // ABCD g SUV i EMQ d RZ
+        // ABCD g SUV i EFMPQ d RZ
+        // ABCD g SUV i EFMPQ d
+        rotate(&mut b[g..d], i - g);
+        // ABCD g EMS i UV d RZ
+        // ABCD g EMQ i SUV d RZ
+        // ABCD g EFM i PQSUV d RZ
+        // ABCD g EFM i PQSUV d
+        if d == b.len() {
+          return d;
+        }
+        // b[..g + d - i + 1] is sorted
+        // Just need to merge b[g + d - i + 1..d] and b[d..] (d - i >= i - g - 1 => d - i > i - g)
+        g += d - i + 1;
+        i = d;
+        // ABCDEMS g UV i RZ
+        // ABCDEMQS g UV i RZ
+        // ABCDEFMPQS g UV i RZ
+        break
+      } else {
+        // d > i --> d - i > 0 --> i - g - 1 > 1 --> i - g > 2
+        // left at least 2 bigger than right, so we will still have a left afterwards
+        let tmp = b[g];
+        let j = i;
+        while j < d {
+            b[g] = b[j];
+            g += 1;
+            b[j] = b[g];
+            j += 1;
+        }
+        b[g] = tmp;
+        g += 1;
+        // g DEFPQSUV i ABC d MRZ --> ABCD g SUV i EFPQ d MRZ
+        d = merge101(&mut b[i..], d - i) + i;
+        if d == b.len() {
+          return d;
+        }
+        // ABCD g SUV i EFMPQ d RZ - d indicates all values < b[g]
+      } 
+    }
+  }
 
 
 fn child(b, g, i, d)
--- g is start of L, i is start of R
--- assert g < i < b.len() -- both sizes have non-zero length
--- i < d <= b.len() is the index where all RHS elements before it are known to be < L0 (i.e. there may be later values < L0)
--- returns the position after the final position of Lmax + acc
 // search for L0 in R
 d = get_insert_pos(&b[0], &b[d..]) + d;  // d is now the index where all R are < L0
   -- b[i..i + k], b[0], 
