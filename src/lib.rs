@@ -4,7 +4,6 @@ extern crate gcd;
 
 use std::cmp::min;
 use std::cmp::Ordering;
-use std::mem::MaybeUninit;
 
 use gcd::Gcd;
 
@@ -127,10 +126,12 @@ where
     binary_search(value, &buffer[..hi], lo, compare)
 }
 
+#[inline]
 fn binary_search<T, F>(value: &T, buffer: &[T], start: usize, compare: &F) -> usize
 where
     F: Fn(&T, &T) -> Ordering,
 {
+    // buffer[start..].partition_point(|p| compare(value, p) == Ordering::Greater) + start
     let length = buffer.len();
     let mut lo = start; // lowest candidate
     let mut hi = length; // highest candidate
@@ -759,11 +760,10 @@ where
         if i - g == 1 {
             let d = gallop_from_left(&b[g], &b[i..], cmpleftright) + i;
             let buf = b.as_mut_ptr();
-            let mut tmp = MaybeUninit::<T>::uninit();
             unsafe {
-                std::ptr::copy_nonoverlapping(buf.offset(g as isize), tmp.as_mut_ptr(), 1);
+                let tmp = buf.offset(g as isize).read();
                 std::ptr::copy(buf.offset(i as isize), buf.offset(g as isize), d - i);
-                std::ptr::copy_nonoverlapping(tmp.as_ptr(), buf.offset(d as isize - 1), 1);
+                std::ptr::write(buf.offset(d as isize - 1), tmp);
             }
             // println!("merged1 {:?}", &b);
             return d;
@@ -789,18 +789,20 @@ where
                 // println!("after1 {:?} {:?} {:?} {:?}", &b[..g], &b[g..i], &b[i..d], &b[d..]);
                 break;
             } else {
+                // d - i >= 1 -> d - i + 1 >= 2; i - g > d - i + 1 -> i - g > 2
                 let buf = b.as_mut_ptr();
-                let mut tmp = MaybeUninit::<T>::uninit();
                 let mut j = i;
                 unsafe {
-                    std::ptr::copy_nonoverlapping(buf.offset(g as isize), tmp.as_mut_ptr(), 1);
+                    let tmp = buf.offset(g as isize).read();
                     while j < d {
-                        std::ptr::copy_nonoverlapping(buf.offset(j as isize), buf.offset(g as isize), 1);
+                        std::ptr::write(buf.offset(g as isize), buf.offset(j as isize).read());
+                        // std::ptr::copy_nonoverlapping(buf.offset(j as isize), buf.offset(g as isize), 1);
                         g += 1;
-                        std::ptr::copy_nonoverlapping(buf.offset(g as isize), buf.offset(j as isize), 1);
+                        std::ptr::write(buf.offset(j as isize), buf.offset(g as isize).read());
+                        // std::ptr::copy_nonoverlapping(buf.offset(g as isize), buf.offset(j as isize), 1);
                         j += 1;
                     }
-                    std::ptr::copy_nonoverlapping(tmp.as_ptr(), buf.offset(g as isize), 1);
+                    std::ptr::write(buf.offset(g as isize), tmp);
                 }
                 g += 1;
                 // println!("after {:?} {:?} {:?} {:?}", &b[..g], &b[g..i], &b[i..d], &b[d..]);
