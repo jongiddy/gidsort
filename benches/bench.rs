@@ -9,7 +9,6 @@ use rand::{thread_rng, Rng};
 use std::mem;
 use test::Bencher;
 
-
 fn gen_ascending(len: usize) -> Vec<u64> {
     (0..len as u64).collect()
 }
@@ -51,7 +50,7 @@ fn gen_short_runs(len: usize) -> Vec<u64> {
     let mut v = gen_ascending(len);
     let last = v.len() - 1;
     v.swap(0, last);
-    for i in 1 .. last {
+    for i in 1..last {
         if i % 2 == 0 {
             v.swap(i - 1, i);
         }
@@ -63,10 +62,10 @@ fn gen_nightmare(_: usize) -> Vec<u64> {
     let mut left = Vec::<u64>::new();
     let mut right = Vec::<u64>::new();
     let mut val = 0;
-    for i in 2 .. 513 {
+    for i in 2..513 {
         right.push(val);
         val += 1;
-        for _ in 0 .. i {
+        for _ in 0..i {
             left.push(val);
             val += 1;
         }
@@ -79,10 +78,10 @@ fn gen_marenight(_: usize) -> Vec<u64> {
     let mut left = Vec::<u64>::new();
     let mut right = Vec::<u64>::new();
     let mut val = 0;
-    for i in 2 .. 513 {
+    for i in 2..513 {
         right.push(val);
         val += 1;
-        for _ in 0 .. i {
+        for _ in 0..i {
             left.push(val);
             val += 1;
         }
@@ -111,7 +110,7 @@ macro_rules! sort_bench {
             b.iter(|| $gen($len).sort());
             b.bytes = $len * mem::size_of_val(&$gen(1)[0]) as u64;
         }
-    }
+    };
 }
 
 sort_bench!(small_random_2773383a3_s, gen_random, 10);
@@ -130,8 +129,16 @@ sort_bench!(large_short_runs_2773383a3_s, gen_short_runs, 10000);
 sort_bench!(large_random_2773383a3_s, gen_random, 10000);
 sort_bench!(large_ascending_2773383a3_s, gen_ascending, 10000);
 sort_bench!(large_descending_2773383a3_s, gen_descending, 10000);
-sort_bench!(large_mostly_ascending_2773383a3_s, gen_mostly_ascending, 10000);
-sort_bench!(large_mostly_descending_2773383a3_s, gen_mostly_descending, 10000);
+sort_bench!(
+    large_mostly_ascending_2773383a3_s,
+    gen_mostly_ascending,
+    10000
+);
+sort_bench!(
+    large_mostly_descending_2773383a3_s,
+    gen_mostly_descending,
+    10000
+);
 
 sort_bench!(nightmare_2773383a3_s, gen_nightmare, 1);
 sort_bench!(marenight_2773383a3_s, gen_marenight, 1);
@@ -147,7 +154,7 @@ macro_rules! unstable_sort_bench {
             b.iter(|| $gen($len).sort_unstable());
             b.bytes = $len * mem::size_of_val(&$gen(1)[0]) as u64;
         }
-    }
+    };
 }
 
 unstable_sort_bench!(small_random_2773383a3_u, gen_random, 10);
@@ -166,8 +173,16 @@ unstable_sort_bench!(large_short_runs_2773383a3_u, gen_short_runs, 10000);
 unstable_sort_bench!(large_random_2773383a3_u, gen_random, 10000);
 unstable_sort_bench!(large_ascending_2773383a3_u, gen_ascending, 10000);
 unstable_sort_bench!(large_descending_2773383a3_u, gen_descending, 10000);
-unstable_sort_bench!(large_mostly_ascending_2773383a3_u, gen_mostly_ascending, 10000);
-unstable_sort_bench!(large_mostly_descending_2773383a3_u, gen_mostly_descending, 10000);
+unstable_sort_bench!(
+    large_mostly_ascending_2773383a3_u,
+    gen_mostly_ascending,
+    10000
+);
+unstable_sort_bench!(
+    large_mostly_descending_2773383a3_u,
+    gen_mostly_descending,
+    10000
+);
 
 unstable_sort_bench!(nightmare_2773383a3_u, gen_nightmare, 1);
 unstable_sort_bench!(marenight_2773383a3_u, gen_marenight, 1);
@@ -183,7 +198,7 @@ macro_rules! glidesort_bench {
             b.iter(|| glidesort::sort(&mut $gen($len)));
             b.bytes = $len * mem::size_of_val(&$gen(1)[0]) as u64;
         }
-    }
+    };
 }
 
 glidesort_bench!(small_random_glidesort, gen_random, 10);
@@ -202,8 +217,16 @@ glidesort_bench!(large_short_runs_glidesort, gen_short_runs, 10000);
 glidesort_bench!(large_random_glidesort, gen_random, 10000);
 glidesort_bench!(large_ascending_glidesort, gen_ascending, 10000);
 glidesort_bench!(large_descending_glidesort, gen_descending, 10000);
-glidesort_bench!(large_mostly_ascending_glidesort, gen_mostly_ascending, 10000);
-glidesort_bench!(large_mostly_descending_glidesort, gen_mostly_descending, 10000);
+glidesort_bench!(
+    large_mostly_ascending_glidesort,
+    gen_mostly_ascending,
+    10000
+);
+glidesort_bench!(
+    large_mostly_descending_glidesort,
+    gen_mostly_descending,
+    10000
+);
 
 glidesort_bench!(nightmare_glidesort, gen_nightmare, 1);
 glidesort_bench!(marenight_glidesort, gen_marenight, 1);
@@ -219,7 +242,7 @@ macro_rules! new_sort_bench {
             b.iter(|| gidsort::sort(&mut $gen($len)));
             b.bytes = $len * mem::size_of_val(&$gen(1)[0]) as u64;
         }
-    }
+    };
 }
 
 new_sort_bench!(small_random_gidsort, gen_random, 10);
@@ -239,7 +262,11 @@ new_sort_bench!(large_random_gidsort, gen_random, 10000);
 new_sort_bench!(large_ascending_gidsort, gen_ascending, 10000);
 new_sort_bench!(large_descending_gidsort, gen_descending, 10000);
 new_sort_bench!(large_mostly_ascending_gidsort, gen_mostly_ascending, 10000);
-new_sort_bench!(large_mostly_descending_gidsort, gen_mostly_descending, 10000);
+new_sort_bench!(
+    large_mostly_descending_gidsort,
+    gen_mostly_descending,
+    10000
+);
 
 new_sort_bench!(nightmare_gidsort, gen_nightmare, 1);
 new_sort_bench!(marenight_gidsort, gen_marenight, 1);

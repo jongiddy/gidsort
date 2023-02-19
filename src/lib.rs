@@ -182,6 +182,38 @@ fn rotate<T>(s: &mut [T], rlen: usize) {
     }
 }
 
+fn rotate_left<T>(s: &mut [T], llen: usize) {
+    // Rotate the llen elements to the back of the slice.
+    debug_assert!(llen > 0);
+    if llen == 1 {
+        rotate_left_1(s);
+        return;
+    }
+    let rlen = s.len() - llen;
+    if rlen == 1 {
+        rotate_right_1(s);
+        return;
+    }
+    debug_assert!(rlen > 0);
+    if llen == rlen {
+        swap_ends(s, llen);
+    } else {
+        rotate_gcd(s, rlen);
+    }
+}
+
+fn rotate_left_1<T>(s: &mut [T]) {
+    debug_assert!(s.len() > 1);
+    let r = s.len() - 1;
+    unsafe {
+        let src = s.as_ptr();
+        let dst = s.as_mut_ptr();
+        let tmp = std::ptr::read(src);
+        std::ptr::copy(src.add(1), dst, r);
+        std::ptr::write(dst.add(r), tmp);
+    }
+}
+
 fn rotate_right_1<T>(s: &mut [T]) {
     debug_assert!(s.len() > 1);
     let r = s.len() - 1;
@@ -194,19 +226,24 @@ fn rotate_right_1<T>(s: &mut [T]) {
     }
 }
 
+#[inline]
 fn merge<T, F, G>(b: &mut [T], i: usize, cmpleftright: &F, cmprightleft: &G) -> usize
 where
     T: std::fmt::Debug,
     F: Fn(&T, &T) -> Ordering,
     G: Fn(&T, &T) -> Ordering,
 {
-    if i == 0 || i == b.len() {
-        return b.len();
+    debug_assert!(i > 0 && i < b.len());
+    if cmpleftright(unsafe { b.get_unchecked(i - 1) }, unsafe {
+        b.get_unchecked(i)
+    }) == Ordering::Less
+    {
+        return i;
     }
-    merge101(b, i, cmpleftright, cmprightleft)
+    merge1(b, i, cmpleftright, cmprightleft)
 }
 
-fn merge101<T, F, G>(b: &mut [T], mut i: usize, cmpleftright: &F, cmprightleft: &G) -> usize
+fn merge1<T, F, G>(b: &mut [T], mut i: usize, cmpleftright: &F, cmprightleft: &G) -> usize
 where
     T: std::fmt::Debug,
     F: Fn(&T, &T) -> Ordering,
@@ -217,56 +254,70 @@ where
     loop {
         // println!("mergeloop {:?} {:?} {:?}", &b[..g], &b[g..i], &b[i..]);
         if i - g == 1 {
-            let d = gallop_from_left(&b[g], &b[i..], cmpleftright) + i;
-            let buf = b.as_mut_ptr();
-            unsafe {
-                let tmp = buf.offset(g as isize).read();
-                std::ptr::copy(buf.offset(i as isize), buf.offset(g as isize), d - i);
-                std::ptr::write(buf.offset(d as isize - 1), tmp);
-            }
+            let d = gallop_from_left(
+                unsafe { b.get_unchecked(g) },
+                unsafe { b.get_unchecked(i + 1..) },
+                cmpleftright,
+            ) + i
+                + 1;
+            rotate_left_1(unsafe {b.get_unchecked_mut(g..d)});
             // println!("merged1 {:?}", &b);
             return d;
         }
-        if cmpleftright(&b[i - 1], &b[i]) == Ordering::Less {
-            return i;
-        }
-        g += gallop_from_left(&b[i], &b[g..i - 1], cmprightleft);
+        g += gallop_from_left(
+            unsafe { b.get_unchecked(i) },
+            unsafe { b.get_unchecked(g..i - 1) },
+            cmprightleft,
+        );
         let mut d = i + 1;
         loop {
             // println!("childloop {:?} {:?} {:?} {:?}", &b[..g], &b[g..i], &b[i..d], &b[d..]);
-            d += gallop_from_left(&b[g], &b[d..], cmpleftright);
+            d += gallop_from_left(
+                unsafe { b.get_unchecked(g) },
+                unsafe { b.get_unchecked(d..) },
+                cmpleftright,
+            );
             if d == b.len() {
-                rotate(&mut b[g..], d - i);
+                rotate_left(unsafe { b.get_unchecked_mut(g..) }, i - g);
                 // println!("merged {:?}", b);
                 return d;
             }
             // println!("before {:?} {:?} {:?} {:?}", &b[..g], &b[g..i], &b[i..d], &b[d..]);
             if d - i + 1 >= i - g {
-                rotate(&mut b[g..d], d - i);
+                rotate_left(unsafe { b.get_unchecked_mut(g..d) }, i - g);
                 g += d - i + 1;
                 i = d;
+                if cmpleftright(unsafe { b.get_unchecked(i - 1) }, unsafe {
+                    b.get_unchecked(i)
+                }) == Ordering::Less
+                {
+                    return i;
+                }
                 // println!("after1 {:?} {:?} {:?} {:?}", &b[..g], &b[g..i], &b[i..d], &b[d..]);
                 break;
             } else {
                 // d - i >= 1 -> d - i + 1 >= 2; i - g > d - i + 1 -> i - g > 2
                 let buf = b.as_mut_ptr();
-                let mut j = i;
                 unsafe {
                     let tmp = buf.offset(g as isize).read();
-                    while j < d {
+                    for j in i..d {
                         std::ptr::write(buf.offset(g as isize), buf.offset(j as isize).read());
                         // std::ptr::copy_nonoverlapping(buf.offset(j as isize), buf.offset(g as isize), 1);
                         g += 1;
                         std::ptr::write(buf.offset(j as isize), buf.offset(g as isize).read());
                         // std::ptr::copy_nonoverlapping(buf.offset(g as isize), buf.offset(j as isize), 1);
-                        j += 1;
                     }
                     std::ptr::write(buf.offset(g as isize), tmp);
                 }
                 g += 1;
                 // println!("after {:?} {:?} {:?} {:?}", &b[..g], &b[g..i], &b[i..d], &b[d..]);
                 if d < b.len() {
-                    d = merge101(&mut b[i..], d - i, cmpleftright, cmprightleft) + i;
+                    d = merge(
+                        unsafe { b.get_unchecked_mut(i..) },
+                        d - i,
+                        cmpleftright,
+                        cmprightleft,
+                    ) + i;
                 }
             }
         }
@@ -648,44 +699,6 @@ mod tests {
         for elem in s.iter() {
             assert_eq!(*elem, 5);
         }
-    }
-
-    #[test]
-    fn merge_0() {
-        let mut s: [i32; 0] = [];
-        let count = Cell::new(0);
-        let compare = |a: &i32, b: &i32| {
-            count.set(count.get() + 1);
-            i32::cmp(&a, &b)
-        };
-        super::merge(&mut s, 0, &compare, &compare);
-        assert_eq!(count.get(), 0);
-    }
-
-    #[test]
-    fn merge_0_1() {
-        let mut s = [1];
-        let count = Cell::new(0);
-        let compare = |a: &i32, b: &i32| {
-            count.set(count.get() + 1);
-            i32::cmp(&a, &b)
-        };
-        super::merge(&mut s, 0, &compare, &compare);
-        assert_eq!(count.get(), 0);
-        assert_eq!(s[0], 1);
-    }
-
-    #[test]
-    fn merge_1_0() {
-        let mut s = [1];
-        let count = Cell::new(0);
-        let compare = |a: &i32, b: &i32| {
-            count.set(count.get() + 1);
-            i32::cmp(&a, &b)
-        };
-        super::merge(&mut s, 1, &compare, &compare);
-        assert_eq!(count.get(), 0);
-        assert_eq!(s[0], 1);
     }
 
     #[test]
