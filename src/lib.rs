@@ -4,6 +4,7 @@ extern crate gcd;
 
 use std::cmp::min;
 use std::cmp::Ordering;
+use std::ptr::swap_nonoverlapping;
 
 use gcd::Gcd;
 
@@ -12,7 +13,7 @@ use gcd::Gcd;
 extern crate quickcheck;
 
 macro_rules! debug {
-    ($( $arg:expr ),*) => (if cfg!(debug_assertions) { println!($($arg),*) })
+    ($( $arg:expr ),*) => (if cfg!(debug_assertions) { println!($($arg),*); })
 }
 
 // Tuning parameters:
@@ -234,6 +235,7 @@ where
     G: Fn(&T, &T) -> Ordering,
 {
     debug_assert!(i > 0 && i < b.len());
+    // debug!("{:?} i {:?}", &b[..i], &b[i..]);
     if cmpleftright(unsafe { b.get_unchecked(i - 1) }, unsafe {
         b.get_unchecked(i)
     }) == Ordering::Less
@@ -249,75 +251,147 @@ where
     F: Fn(&T, &T) -> Ordering,
     G: Fn(&T, &T) -> Ordering,
 {
-    // println!("merge {:?} {:?}", &b[..i], &b[i..]);
+    macro_rules! index {
+        ($index:expr) => {
+            unsafe { b.get_unchecked($index) }
+        };
+        (mut $index:expr) => {
+            unsafe { b.get_unchecked_mut($index) }
+        };
+    }
+
+    macro_rules! log {
+        ($g:expr, $i:expr, $d:expr) => {
+            dbg!(&b[..$g], &b[$g..$i], &b[$i..$d], &b[$d..]);
+        }
+    }
+    // Describe the state of the slice as
+    // b: |--------g--------i--------d--------|
+    //        S        G        I        D
+    // S = sorted into final position
+    // G = left side of merge
+    // I = values known to be < b[g]
+    // D = right side of merge
+    // Initially we have:
+    // b: g-----------------i-----------------|
     let mut g = 0;
     loop {
-        // println!("mergeloop {:?} {:?} {:?}", &b[..g], &b[g..i], &b[i..]);
+        debug_assert!(i > 0 && i < b.len());
+        debug_assert!(cmpleftright(index!(i - 1), index!(i)) != Ordering::Less);
+        // debug!("{:?} g {:?} i {:?}", &b[..g], &b[g..i], &b[i..]);
         if i - g == 1 {
-            let d = gallop_from_left(
-                unsafe { b.get_unchecked(g) },
-                unsafe { b.get_unchecked(i + 1..) },
-                cmpleftright,
-            ) + i
-                + 1;
-            rotate_left_1(unsafe {b.get_unchecked_mut(g..d)});
+            // Insert single G value into correct position.
+            let d = gallop_from_left(index!(g), index!(i + 1..), cmpleftright) + i + 1;
+            // log!(g, i, d);
+            rotate_left_1(index!(mut g..d));
+            // log!(g, i, d);
             // println!("merged1 {:?}", &b);
             return d;
         }
-        g += gallop_from_left(
-            unsafe { b.get_unchecked(i) },
-            unsafe { b.get_unchecked(g..i - 1) },
-            cmprightleft,
-        );
+        if b.len() - i == 1 {
+            // Insert single D value into correct position.
+            let d = gallop_from_left(index!(i), index!(..i - 1), cmprightleft);
+            // log!(g, i, d);
+            rotate_right_1(index!(mut d..));
+            // log!(g, i, d);
+            // println!("merged1 {:?}", &b);
+            return b.len();
+        }
+        // Look for where leftmost right value lives on left side.
+        // Everything before this position is already sorted, so move g to add these values to S.
+        g += gallop_from_left(index!(i), index!(g..i - 1), cmprightleft);
+        // The leftmost value on the right is now known to be < b[g]
         let mut d = i + 1;
         loop {
-            // println!("childloop {:?} {:?} {:?} {:?}", &b[..g], &b[g..i], &b[i..d], &b[d..]);
-            d += gallop_from_left(
-                unsafe { b.get_unchecked(g) },
-                unsafe { b.get_unchecked(d..) },
-                cmpleftright,
-            );
+            assert!(g < i && i < d);
+            // log!(g, i, d);
+            // There might be more values on the right that are < b[g]. Let's find them.
+            d += gallop_from_left(index!(g), index!(d..), cmpleftright);
+            // log!(g, i, d);
+            // If all values on the right are < b[g], rotate I before G and we are done.
             if d == b.len() {
-                rotate_left(unsafe { b.get_unchecked_mut(g..) }, i - g);
+                rotate_left(index!(mut g..), i - g);
+                // log!(g, i, d);
                 // println!("merged {:?}", b);
                 return d;
             }
-            // println!("before {:?} {:?} {:?} {:?}", &b[..g], &b[g..i], &b[i..d], &b[d..]);
+            // All the values in I can be moved before G and then added to S. In addition b[g]
+            // can be added to S afterwards. To makes space at the end of S for I + b[g] we
+            // move |I| values in G into I. We move |I| + 1 values into S.  If that consumes all
+            // of I then we can rotate the values and then merge the moved G into the remaining D.
             if d - i + 1 >= i - g {
-                rotate_left(unsafe { b.get_unchecked_mut(g..d) }, i - g);
+                rotate_left(index!(mut g..d), i - g);
                 g += d - i + 1;
                 i = d;
-                if cmpleftright(unsafe { b.get_unchecked(i - 1) }, unsafe {
-                    b.get_unchecked(i)
-                }) == Ordering::Less
-                {
+                // log!(g, i, d);
+                if cmpleftright(index!(i - 1), index!(i)) == Ordering::Less {
                     return i;
                 }
-                // println!("after1 {:?} {:?} {:?} {:?}", &b[..g], &b[g..i], &b[i..d], &b[d..]);
                 break;
             } else {
+                // Otherwise, after the swap, we merge I and D together, and then loop. We know that the rightmost
+                // I value is < b[g], so if the merge moves it right, then we expand I (move d right).
+                // The merge is expensive so we do some extra steps to see if we can avoid the merge or, at least,
+                // maximise the benefit of the merge by merging more values at once.
                 // d - i >= 1 -> d - i + 1 >= 2; i - g > d - i + 1 -> i - g > 2
+                debug_assert!(i - g > 2);
                 let buf = b.as_mut_ptr();
                 unsafe {
-                    let tmp = buf.offset(g as isize).read();
+                    let tmp = buf.add(g).read();
                     for j in i..d {
-                        std::ptr::write(buf.offset(g as isize), buf.offset(j as isize).read());
-                        // std::ptr::copy_nonoverlapping(buf.offset(j as isize), buf.offset(g as isize), 1);
+                        std::ptr::write(buf.add(g), buf.add(j).read());
+                        // std::ptr::copy_nonoverlapping(buf.add(j), buf.add(g), 1);
                         g += 1;
-                        std::ptr::write(buf.offset(j as isize), buf.offset(g as isize).read());
-                        // std::ptr::copy_nonoverlapping(buf.offset(g as isize), buf.offset(j as isize), 1);
+                        std::ptr::write(buf.add(j), buf.add(g).read());
+                        // std::ptr::copy_nonoverlapping(buf.add(g), buf.add(j), 1);
                     }
-                    std::ptr::write(buf.offset(g as isize), tmp);
+                    std::ptr::write(buf.add(g), tmp);
                 }
                 g += 1;
-                // println!("after {:?} {:?} {:?} {:?}", &b[..g], &b[g..i], &b[i..d], &b[d..]);
+                // new g = old g + d - i + 1
+                // old g = new g - d + i - 1
+                // From if: d - i + 1 < i - old g
+                // old g + d - 2i + 1 < 0
+                // old g < 2i - d - 1
+                // new g - d + i - 1 < 2i - d - 1
+                // new g < i 
+                debug_assert!(g < i);
+
                 if d < b.len() {
-                    d = merge(
-                        unsafe { b.get_unchecked_mut(i..) },
-                        d - i,
-                        cmpleftright,
-                        cmprightleft,
-                    ) + i;
+                    // Avoid the merge or maximize the size of the merge. In the values to be merged, if b[d] < b[i] then we can
+                    // swap b[d] with b[g]. And continue until b[d] > b[i].
+                    // We can only swap as many values as there are in b[g..i] or in b[d..].
+                    let upper = std::cmp::min(b.len(), d + i - g);
+                    let j = gallop_from_left(index!(i), index!(d..upper), cmpleftright);
+                    if j > 0 {
+                        let buf = b.as_mut_ptr();
+                        unsafe { swap_nonoverlapping(buf.add(g), buf.add(d), j) };
+                        g += j;
+                        d += j;
+                        if d == b.len() {
+                            // We moved all of D into S. All that is left to do is rotate I before G.
+                            if g < i {
+                                rotate_left(index!(mut g..), i - g);
+                            }
+                            return b.len();
+                        }
+                        if g == i {
+                            // We moved all of G into I. We just have I and D to merge.
+                            i = d;
+                            if cmpleftright(index!(i - 1), index!(i)) == Ordering::Less {
+                                return i;
+                            }
+                            break;
+                        }
+                    }
+                    if d + j < upper {
+                        // We know that b[i] < b[d] so do not include b[i] in the merge
+                        if d - i > 1 {
+                            d = merge(index!(mut i + 1..), d - i - 1, cmpleftright, cmprightleft) + i + 1;
+                        }
+                    } else {
+                        d = merge(index!(mut i..), d - i, cmpleftright, cmprightleft) + i;
+                    }
                 }
             }
         }
@@ -355,7 +429,7 @@ where
     // This function also returns a boolean which indicates if the block is mostly descending.
     // This can be used for further optimisation at a higher level.
     assert!(s.len() == 4);
-    debug!("sort4 in {:?}", s);
+    debug!("sort4 in {:?}", &s);
     if ascending!(compare(&s[0], &s[1])) {
         if ascending!(compare(&s[1], &s[2])) {
             // 1234 1243 1342 2341
@@ -378,7 +452,7 @@ where
             // 1234 = 3
             // 2341 = 4
             // 1243 1342 = 5
-            debug!("sort4 {:?}", s);
+            debug!("sort4 {:?}", &s);
             false
         } else {
             // 1324 1423 1432 2314
@@ -396,7 +470,7 @@ where
                 }
                 // 1324(1324) 1324(1423) 1324(2314) 1324(2413)
                 s.swap(1, 2);
-                debug!("sort4 {:?}", s);
+                debug!("sort4 {:?}", &s);
                 false
             } else {
                 // 1432(1432) 2431(2431) 1432(3412) 2431(3421)
@@ -406,7 +480,7 @@ where
                 }
                 // 1432(1432) 1432(2431) 1432(3412) 1432(3421)
                 s.swap(1, 3);
-                debug!("sort4 {:?}", s);
+                debug!("sort4 {:?}", &s);
                 true
             }
             // 1324 1423 1432 2314 2413 2431 3412 3421 = 5
@@ -432,7 +506,7 @@ where
                 s.swap(0, 3);
                 s.swap(1, 2);
             }
-            debug!("sort4 {:?}", s);
+            debug!("sort4 {:?}", &s);
             true
             // 4321 = 3
             // 3214 = 4
@@ -452,7 +526,7 @@ where
                     s.swap(2, 3);
                 }
                 s.swap(0, 1);
-                debug!("sort4 {:?}", s);
+                debug!("sort4 {:?}", &s);
                 false
             } else {
                 // 3142(3142) 3241(3241) 3142(4132) 3241(4231)
@@ -463,7 +537,7 @@ where
                 s.swap(2, 3);
                 // 3214(3142) 3214(3241) 3214(4132) 3214(4231)
                 s.swap(0, 2);
-                debug!("sort4 {:?}", s);
+                debug!("sort4 {:?}", &s);
                 false
             }
             // 2134 2143 3124 3142 3241 4123 4132 4231 = 5
@@ -787,7 +861,7 @@ mod tests {
             usize::cmp(&a, &b)
         };
         super::merge(&mut s, leftlen, &compare, &compare);
-        assert_eq!(count.get(), 22);
+        assert_eq!(count.get(), 28);
         for (i, elem) in s.iter().enumerate() {
             assert_eq!(*elem, i + 1);
         }
